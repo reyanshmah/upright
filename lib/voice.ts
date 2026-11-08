@@ -16,7 +16,11 @@ export type CueId =
   | "go"
   | "stop"
   | "measureStop"
-  | "tooFar";
+  | "tooFar"
+  | "tugInstr"
+  | "chairInstr"
+  | "done"
+  | "armsUsed";
 
 const cache = new Map<string, HTMLAudioElement | null>();
 
@@ -64,4 +68,35 @@ export async function playCue(lang: Lang, id: CueId, text: string): Promise<numb
     /* no speech available; the on-screen cue still shows */
   }
   return performance.now();
+}
+
+/** Speaks/plays a cue and resolves when it has finished (max `maxMs`). */
+export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs = 15000): Promise<void> {
+  const audio = await tryAudio(lang, id);
+  if (audio) {
+    audio.currentTime = 0;
+    await new Promise<void>((resolve) => {
+      const done = () => resolve();
+      audio.onended = done;
+      setTimeout(done, maxMs);
+      audio.play().catch(done);
+    });
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    try {
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang === "es" ? "es-US" : "en-US";
+      u.rate = 0.95;
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      synth.speak(u);
+      // Rough fallback if onend never fires: ~70 ms per character.
+      setTimeout(resolve, Math.min(maxMs, 1500 + text.length * 70));
+    } catch {
+      resolve();
+    }
+  });
 }

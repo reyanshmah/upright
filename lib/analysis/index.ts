@@ -1,38 +1,62 @@
 /**
- * ANALYSIS SLOTS: rebuild these at the hackathon.
- *
- * The whole app already calls these functions after each test with the
- * recorded landmark stream. Return null and the app falls back to the
- * helper's manual tap/count; return a value and it is shown as the measured
- * result (the manual number is kept for the stopwatch comparison).
- *
- * Inputs are pure data (LandmarkStream: timestamps + 33 points per frame,
- * goCueT = performance.now() when the "go" cue played), so these can be unit
- * tested on saved recordings without a camera.
- *
- * Useful building blocks already in lib/signal/: OneEuroFilter, kneeAngle,
- * bodyScalePx, cameraSide, StandStateMachine, countChairStands, thresholds.
+ * Offline analysis: replays a saved landmark stream through the SAME detectors
+ * the app runs live, so the numbers on screen and in saved data always match,
+ * and threshold changes can be re-scored on old recordings.
  */
 import type { LandmarkStream } from "../signal/types";
+import { FeatureExtractor } from "./features";
+import { TugDetector, type TugPhases } from "./tug";
+import { ChairDetector } from "./chair";
 
 export interface TugAnalysis {
-  /** Seconds from the go cue to seated and still. */
+  /** Seconds from the go cue to seated again. */
   totalS: number;
-  /** Optional five-phase breakdown (seconds). */
-  phases?: { standUp: number; walkOut: number; turn: number; walkBack: number; sitDown: number };
+  phases?: TugPhases;
 }
 
 export interface ChairAnalysis {
-  /** Full stands in the 30 s window (STEADI halfway rule applied). */
+  /** Full stands in the 30 s window (halfway rule applied). */
   count: number;
-  /** True if arms were used to rise (score becomes 0). */
   armsUsed: boolean;
+  halfwayCounted: boolean;
 }
 
-export function analyzeTug(_stream: LandmarkStream): TugAnalysis | null {
-  return null; // TODO(hackathon)
+export function analyzeTug(stream: LandmarkStream): TugAnalysis | null {
+  if (stream.goCueT === null) return null;
+  const fx = new FeatureExtractor(stream.videoWidth, stream.videoHeight);
+  const det = new TugDetector();
+  let goSet = false;
+  for (const fr of stream.frames) {
+    if (!goSet && fr.t >= stream.goCueT) {
+      det.setGo(stream.goCueT);
+      goSet = true;
+    }
+    const r = det.push(fx.push(fr.t, fr.landmarks), fr.t);
+    if (r.done) {
+      const phases = det.phases();
+      return { totalS: r.totalS!, ...(phases ? { phases } : {}) };
+    }
+    if (r.phase === "failed") return null;
+  }
+  return null;
 }
 
-export function analyzeChairStand(_stream: LandmarkStream): ChairAnalysis | null {
-  return null; // TODO(hackathon)
+export function analyzeChairStand(stream: LandmarkStream): ChairAnalysis | null {
+  if (stream.goCueT === null) return null;
+  const fx = new FeatureExtractor(stream.videoWidth, stream.videoHeight);
+  const det = new ChairDetector();
+  let goSet = false;
+  let last = null;
+  for (const fr of stream.frames) {
+    if (!goSet && fr.t >= stream.goCueT) {
+      det.setGo(stream.goCueT);
+      goSet = true;
+    }
+    last = det.push(fx.push(fr.t, fr.landmarks), fr.t);
+  }
+  // Close the 30 s window even if recording stopped a frame early.
+  if (goSet) last = det.push(null, stream.goCueT + 30_000);
+  return last ? { count: last.count, armsUsed: last.armsUsed, halfwayCounted: last.halfwayCounted } : null;
 }
+
+export { FeatureExtractor, TugDetector, ChairDetector };

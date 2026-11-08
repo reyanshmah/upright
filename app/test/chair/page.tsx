@@ -11,6 +11,7 @@ export default function ChairPage() {
   const router = useRouter();
   const [session, setSession] = useState<SessionState | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [override, setOverride] = useState(false);
   useEffect(() => {
     setSession(loadSession());
     setLoaded(true);
@@ -25,26 +26,29 @@ export default function ChairPage() {
     );
   }
   const t = STRINGS[session.lang];
-  const tugUnsteady = !!session.tug && !isSkipped(session.tug) && session.tug.lookedUnsteady;
+  const verySlow = !!session.tug && !isSkipped(session.tug) && !!session.tug.verySlow;
 
-  // Safety rule from the plan: skip the chair stand if they looked unsteady in the TUG.
-  if (tugUnsteady) {
+  // Safety: a very slow TUG (>= 20 s) suggests skipping the chair stand.
+  if (verySlow && !override) {
     return (
       <main lang={session.lang}>
         <p className="eyebrow">{t.testOf(2)}</p>
         <h1>{t.chairName}</h1>
-        <div className="card warn"><p>{t.chairSkipNote}</p></div>
-        <div className="row nav">
-          <Link className="btn secondary" href="/test/tug">{t.back}</Link>
+        <div className="card warn"><p>{t.slowSkipNote}</p></div>
+        <div className="choices">
           <button
-            className="btn"
+            className="choice selected"
             onClick={() => {
-              updateSession({ chair: { skipped: true, reason: "unsteady during TUG" } });
+              updateSession({ chair: { skipped: true, reason: "TUG took 20 s or more (safety)" } });
               router.push("/results");
             }}
           >
-            {t.seeResults}
+            {t.skipTest} → {t.seeResults}
           </button>
+          <button className="choice" onClick={() => setOverride(true)}>{t.doAnyway}</button>
+        </div>
+        <div className="row nav">
+          <Link className="btn secondary" href="/test/tug">{t.back}</Link>
         </div>
         <p className="disclaimer">{t.disclaimer}</p>
       </main>

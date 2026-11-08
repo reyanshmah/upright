@@ -28,13 +28,16 @@ export interface Screening {
 export type Source = "auto" | "manual";
 
 export interface TugResult {
+  /** Seconds from "Go" to seated again, measured by the camera. */
   totalS: number;
   source: Source;
-  /** Helper's tap-to-tap time, always kept for the stopwatch comparison. */
-  manualS: number | null;
-  /** Observations from the CDC TUG form. */
-  observations: string[];
-  lookedUnsteady: boolean;
+  /** Five-phase breakdown (seconds), when the boundaries could be found. */
+  phases?: { standUp: number; walkOut: number; turn: number; walkBack: number; sitDown: number };
+  /** Kept for older saved sessions; no longer collected. */
+  manualS?: number | null;
+  observations?: string[];
+  /** TUG >= 20 s: the app suggests skipping the chair stand for safety. */
+  verySlow: boolean;
   fpsMedian: number | null;
   gatesPassed: boolean;
   camera?: CameraInfo;
@@ -50,8 +53,9 @@ export interface CameraInfo {
 export interface ChairResult {
   count: number;
   armsUsed: boolean;
+  /** Last stand counted under the CDC "more than halfway up at 30 s" rule. */
+  halfwayCounted: boolean;
   source: Source;
-  manualCount: number | null;
   fpsMedian: number | null;
   gatesPassed: boolean;
   camera?: CameraInfo;

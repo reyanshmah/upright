@@ -10,8 +10,8 @@ const base: SessionState = {
   screening: { unsteady: false, worry: false, fallen: false, fallCount: null, injured: null },
   createdAt: "2026-11-08T00:00:00Z",
 };
-const tug = (s: number) => ({ totalS: s, source: "manual" as const, manualS: s, observations: [], lookedUnsteady: false, fpsMedian: 30, gatesPassed: true });
-const chair = (n: number, arms = false) => ({ count: n, armsUsed: arms, source: "manual" as const, manualCount: n, fpsMedian: 30, gatesPassed: true });
+const tug = (s: number) => ({ totalS: s, source: "auto" as const, verySlow: s >= 20, fpsMedian: 30, gatesPassed: true });
+const chair = (n: number, arms = false) => ({ count: n, armsUsed: arms, halfwayCounted: false, source: "auto" as const, fpsMedian: 30, gatesPassed: true });
 
 describe("report", () => {
   it("no risk -> exercise, home, repeat (no doctor-first)", () => {

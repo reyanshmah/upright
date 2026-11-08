@@ -16,7 +16,7 @@ Built for DSH Hacks V2.
 | Test 1 TUG + Test 2 chair stand (`/test/tug`, `/test/chair`): instructions, placement diagram, live gates, countdown + "Go" cue, timer, safety stop, manual entry, CDC observations | Done |
 | Results (`/results`): family action plan (EN/ES template) + printable clinician summary + anonymous data download | Done |
 | CDC thresholds: TUG >= 12 s, chair-stand norms 60–94, arms used = 0 | Done |
-| **Automatic analysis of the recording** (`lib/analysis/index.ts`) | **Stub: rebuild at the hackathon** |
+| Automatic TUG (auto-stop when seated, 5 phases) and chair stand (count, CDC halfway rule, arm use) — `lib/analysis/` | Done (tested on synthetic streams; needs real-video validation) |
 | Pre-recorded voice MP3s (`public/audio/<lang>/<cue>.mp3`) | Browser speech placeholder |
 | Lighting gate, Claude-written report with number check, Supabase | TODO |
 

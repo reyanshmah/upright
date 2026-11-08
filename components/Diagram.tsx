@@ -13,7 +13,7 @@ export function SetupDiagram({ kind }: { kind: "tug" | "chair" | "measure" }) {
           <line x1="62" y1="75" x2={62 + lineLen} y2="75" stroke="#e07a2f" strokeWidth="3" strokeDasharray="8 6" />
           <rect x={62 + lineLen - 2} y="50" width="5" height="50" fill="#e07a2f" />
           <text x={62 + lineLen / 2} y="66" textAnchor="middle" fontSize="13" fill="currentColor">3 m (10 ft)</text>
-          <text x={62 + lineLen} y="112" textAnchor="middle" fontSize="12" fill="currentColor">tape</text>
+          <text x={62 + lineLen} y="112" textAnchor="middle" fontSize="12" fill="currentColor">mark</text>
         </>
       )}
       {/* phone */}
@@ -31,7 +31,7 @@ export function SetupDiagram({ kind }: { kind: "tug" | "chair" | "measure" }) {
         strokeDasharray="3 4"
       />
       <text x={kind === "chair" ? 90 : 220} y="185" fontSize="12" fill="currentColor">
-        {kind === "chair" ? "phone, 1–2 m to the side" : "phone, ~2 m (wide) or ~3 m to the side"}
+        {kind === "chair" ? "phone, 1–2 m to the side" : "phone, 2–3 m to the side"}
       </text>
     </svg>
   );

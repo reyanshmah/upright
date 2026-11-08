@@ -8,6 +8,7 @@ import { clearSession, isSkipped, loadSession, type SessionState } from "@/lib/s
 import { reportFacts, stepOrder, STEP_TEXT } from "@/lib/report";
 import { TUG_RISK_SECONDS } from "@/lib/signal/thresholds";
 import { cmToFtIn } from "@/lib/measure";
+import { PhaseBars } from "@/components/TestRunner";
 
 const R = {
   en: {
@@ -51,8 +52,6 @@ const R = {
     newScreen: "Empezar una nueva evaluación",
   },
 };
-
-const OBS_EN = STRINGS.en.tugObs;
 
 export default function Results() {
   const router = useRouter();
@@ -141,6 +140,8 @@ export default function Results() {
           </li>
         </ul>
 
+        {tug?.phases && <PhaseBars phases={tug.phases} t={t} />}
+
         <h2>{r.planTitle}</h2>
         {f.injuredFall && <p className="note"><b>{t.resultInjured}</b></p>}
         {f.multipleFalls && <p className="note"><b>{t.resultTwoPlus}</b></p>}
@@ -184,10 +185,10 @@ export default function Results() {
                 {tug ? (
                   <>
                     <b>{tug.totalS.toFixed(1)} s</b> ({tug.totalS >= TUG_RISK_SECONDS ? `≥ ${TUG_RISK_SECONDS} s: at risk` : `< ${TUG_RISK_SECONDS} s`}) ·
-                    Source: {tug.source === "auto" ? "camera (on-device pose)" : "helper stopwatch tap"}
-                    {tug.manualS !== null && tug.source === "auto" ? ` · helper tap ${tug.manualS.toFixed(1)} s` : ""} ·
-                    Observations: {tug.observations.length ? tug.observations.map((k) => OBS_EN[k] ?? k).join(", ") : "none noted"} ·
-                    Looked unsteady: {tug.lookedUnsteady ? "yes" : "no"}
+                    Measured automatically (on-device pose, timed from the “Go” cue to seated)
+                    {tug.phases
+                      ? ` · Phases: stand up ${tug.phases.standUp.toFixed(1)} s, walk out ${tug.phases.walkOut.toFixed(1)} s, turn ${tug.phases.turn.toFixed(1)} s, walk back ${tug.phases.walkBack.toFixed(1)} s, sit down ${tug.phases.sitDown.toFixed(1)} s`
+                      : " · Phase breakdown unavailable"}
                   </>
                 ) : (
                   `Not done (${s.tug && isSkipped(s.tug) ? s.tug.reason : "—"})`
@@ -199,9 +200,9 @@ export default function Results() {
               <td>
                 {chair ? (
                   <>
-                    <b>Score {f.chairScore}</b>{chair.armsUsed ? " (arms used → 0 per CDC form)" : ` (${chair.count} stands)`} ·
+                    <b>Score {f.chairScore}</b>{chair.armsUsed ? " (arms used to rise → 0 per CDC form)" : ` (${chair.count} stands${chair.halfwayCounted ? ", last counted by the halfway rule" : ""})`} ·
                     {f.chairNorm === null ? " no CDC norm for age" : ` CDC below-average cutoff < ${f.chairNorm}: ${f.chairBelow ? "below average" : "not below"}`} ·
-                    Source: {chair.source === "auto" ? "camera (on-device pose)" : "helper count"}
+                    Counted automatically (on-device pose)
                   </>
                 ) : (
                   `Not done (${s.chair && isSkipped(s.chair) ? s.chair.reason : "—"})`

@@ -5,17 +5,21 @@ import { STRINGS, type Lang } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage, GateBadges } from "@/components/CameraStage";
 import { SetupDiagram } from "@/components/Diagram";
-import { playCue, unlockAudio } from "@/lib/voice";
+import { playCue, playCueAndWait, unlockAudio } from "@/lib/voice";
 import { analyzeChairStand, analyzeTug } from "@/lib/analysis";
+import { FeatureExtractor } from "@/lib/analysis/features";
+import { TugDetector, type TugPhase, type TugPhases } from "@/lib/analysis/tug";
+import { ChairDetector } from "@/lib/analysis/chair";
+import { StableFlag } from "@/lib/signal/gate";
 import type { LandmarkStream, PoseFrame } from "@/lib/signal/types";
 import type { ChairResult, TugResult } from "@/lib/session";
-import { scoreChairStand, tugAtRisk, ALGO, type Sex } from "@/lib/signal/thresholds";
+import { scoreChairStand, tugAtRisk, type Sex } from "@/lib/signal/thresholds";
 
 type Kind = "tug" | "chair";
-type Phase = "intro" | "position" | "countdown" | "running" | "aborted" | "entry" | "done";
+type Phase = "intro" | "position" | "instructions" | "countdown" | "running" | "aborted" | "failed" | "done";
 
-const TUG_MAX_S = 120;
-const GATE_HOLD_MS = 2000;
+const GATE_HOLD_MS = 1500;
+const VERY_SLOW_S = 20;
 
 export function TestRunner({
   kind,
@@ -37,34 +41,53 @@ export function TestRunner({
   const t = STRINGS[lang];
   const n = kind === "tug" ? 1 : 2;
   const [phase, setPhase] = useState<Phase>("intro");
-  const [noCam, setNoCam] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [elapsed, setElapsed] = useState(0);
   const [gateHeldMs, setGateHeldMs] = useState(0);
+  const [seated, setSeated] = useState(false);
+  const [armsCrossed, setArmsCrossed] = useState(false);
+  const [livePhase, setLivePhase] = useState<TugPhase>("waiting");
+  const [liveCount, setLiveCount] = useState(0);
+  const [failMsg, setFailMsg] = useState("");
+  const [saved, setSaved] = useState<TugResult | ChairResult | null>(null);
+
+  const phaseRef = useRef<Phase>("intro");
+  phaseRef.current = phase;
   const goT = useRef<number | null>(null);
   const gateSince = useRef<number | null>(null);
   const frameOk = useRef({ ok: 0, total: 0 });
   const stream = useRef<LandmarkStream | null>(null);
-  const fpsMedian = useRef<number | null>(null);
-  const phaseRef = useRef<Phase>("intro");
-  phaseRef.current = phase;
+  const fx = useRef<FeatureExtractor | null>(null);
+  const tugDet = useRef<TugDetector | null>(null);
+  const chairDet = useRef<ChairDetector | null>(null);
+  const seatedFlag = useRef(new StableFlag(400, 600));
+  const armsFlag = useRef(new StableFlag(400, 600));
+  const finishing = useRef(false);
 
-  // entry fields
-  const [manualS, setManualS] = useState<number | null>(null);
-  const [timeText, setTimeText] = useState("");
-  const [obs, setObs] = useState<string[]>([]);
-  const [unsteady, setUnsteady] = useState<boolean | null>(null);
-  const [countText, setCountText] = useState("");
-  const [arms, setArms] = useState<boolean | null>(null);
-  const [auto, setAuto] = useState<{ totalS?: number; count?: number; armsUsed?: boolean } | null>(null);
-  const [saved, setSaved] = useState<TugResult | ChairResult | null>(null);
+  const newDetectors = (w: number, h: number) => {
+    fx.current = new FeatureExtractor(w, h);
+    tugDet.current = new TugDetector();
+    chairDet.current = new ChairDetector();
+    seatedFlag.current.reset();
+    armsFlag.current.reset();
+  };
 
   const onFrame = (f: FrameInfo) => {
     const p = phaseRef.current;
-    // Before "Go": all gates, including one person in view.
-    // During the test the spotter walks beside them, so only body + fps count.
-    const ok = p === "position" ? f.gatesOk : f.bodyOk && f.fpsOk;
-    if (p === "position") {
+    if (!fx.current) newDetectors(f.w, f.h);
+    const feat = fx.current!.push(f.t, f.main);
+
+    // Detectors see every frame (before Go they learn where the chair is).
+    const tr = tugDet.current!.push(feat, f.t);
+    const cr = chairDet.current!.push(feat, f.t);
+    const isSeated = kind === "tug" ? tugDet.current!.seatedNow : chairDet.current!.seatedNow;
+
+    if (p === "position" || p === "instructions") {
+      const s = seatedFlag.current.update(isSeated, f.t);
+      const a = kind === "chair" ? armsFlag.current.update(feat?.wristLow === false, f.t) : true;
+      setSeated(s);
+      setArmsCrossed(a);
+      const ok = f.gatesOk && s && a;
       if (ok) {
         gateSince.current ??= f.t;
         setGateHeldMs(f.t - gateSince.current);
@@ -73,50 +96,83 @@ export function TestRunner({
         setGateHeldMs(0);
       }
     }
-    if (p === "running" || p === "countdown") {
+
+    if (p === "countdown" || p === "running") {
       frameOk.current.total++;
-      if (ok) frameOk.current.ok++;
+      if (f.bodyOk && f.fpsOk) frameOk.current.ok++;
+    }
+
+    if (p === "running") {
+      if (kind === "tug") {
+        setLivePhase(tr.phase);
+        if (tr.done) void finish();
+        else if (tr.phase === "failed") void finish();
+      } else {
+        setLiveCount(cr.count);
+        if (cr.done) void finish();
+      }
     }
   };
   const cam = usePoseCamera(onFrame);
 
-  // running timer
+  // Timer display + chair-stand 30 s end even if frames stall.
   useEffect(() => {
     if (phase !== "running") return;
     const id = setInterval(() => {
       if (goT.current === null) return;
-      const s = (performance.now() - goT.current) / 1000;
-      setElapsed(s);
-      if (kind === "chair" && s >= ALGO.chairStandWindowS) finishRun();
-      if (kind === "tug" && s >= TUG_MAX_S) finishRun();
+      const now = performance.now();
+      setElapsed((now - goT.current) / 1000);
+      if (kind === "chair") {
+        const cr = chairDet.current!.push(null, now);
+        if (cr.done) void finish();
+      } else {
+        const tr = tugDet.current!.push(null, now);
+        if (tr.phase === "failed") void finish();
+      }
     }, 100);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const beginCountdown = async () => {
+  const openCamera = () => {
     unlockAudio();
+    fx.current = null; // re-created on first frame with the right size
+    gateSince.current = null;
+    setGateHeldMs(0);
+    setPhase("position");
+    void cam.start("environment");
+  };
+
+  const begin = async () => {
+    unlockAudio();
+    cam.startRecording(); // pre-roll: the chair position is learned before Go
     frameOk.current = { ok: 0, total: 0 };
-    cam.startRecording(); // pre-roll before "go"
+    finishing.current = false;
+    setPhase("instructions");
+    await playCueAndWait(lang, kind === "tug" ? "tugInstr" : "chairInstr", kind === "tug" ? t.tugSpoken : t.chairSpoken);
+    if (phaseRef.current !== "instructions") return;
     setPhase("countdown");
     const ids = ["three", "two", "one"] as const;
     for (let i = 3; i >= 1; i--) {
       setCountdown(i);
       void playCue(lang, ids[3 - i], String(i));
       await new Promise((r) => setTimeout(r, 1000));
-      if (phaseRef.current !== "countdown") return;
+      if ((phaseRef.current as Phase) !== "countdown") return;
     }
-    goT.current = await playCue(lang, "go", t.cueGo); // time zero
+    const go = await playCue(lang, "go", t.cueGo); // time zero
+    goT.current = go;
+    tugDet.current!.setGo(go);
+    chairDet.current!.setGo(go);
     setElapsed(0);
+    setLiveCount(0);
+    setLivePhase("standUp");
     setPhase("running");
   };
 
-  const finishRun = () => {
-    if (phaseRef.current !== "running" || goT.current === null) return;
-    const tapS = (performance.now() - goT.current) / 1000;
-    if (kind === "chair") void playCue(lang, "stop", t.cueStop);
-    const { frames, fpsMedian: fm } = cam.stopRecording();
-    fpsMedian.current = fm;
+  const finish = async () => {
+    if (finishing.current || phaseRef.current !== "running") return;
+    finishing.current = true;
+    const { frames, fpsMedian } = cam.stopRecording();
     const { w, h } = cam.videoSize();
     stream.current = {
       version: 1,
@@ -126,23 +182,61 @@ export function TestRunner({
       videoHeight: h,
       frames: frames as PoseFrame[],
     };
-    if (kind === "tug") {
-      const a = analyzeTug(stream.current);
-      setAuto(a ? { totalS: a.totalS } : null);
-      const ms = Math.round(tapS * 10) / 10;
-      setManualS(ms);
-      setTimeText(String(a ? a.totalS.toFixed(1) : ms));
-    } else {
-      const a = analyzeChairStand(stream.current);
-      setAuto(a ? { count: a.count, armsUsed: a.armsUsed } : null);
-      if (a) {
-        setCountText(String(a.count));
-        setArms(a.armsUsed);
-      }
-    }
     cam.stop();
-    setPhase("entry");
+    const { ok, total } = frameOk.current;
+    const gatesPassed = total > 0 && ok / total >= 0.9;
+    const camera = cam.camera ? { label: cam.camera.label, zoom: cam.camera.zoom, wide: cam.camera.wide } : undefined;
+
+    if (kind === "tug") {
+      // Re-run on the full recording (same code) to get the five phases.
+      const a = analyzeTug(stream.current);
+      const live = tugDet.current!;
+      const totalS = a?.totalS ?? (live.phase === "done" && live.endT && goT.current ? (live.endT - goT.current) / 1000 : null);
+      if (totalS === null) {
+        setFailMsg(live.phase === "failed" && elapsedRef() > 85 ? t.failTimeout : t.failLost);
+        setPhase("failed");
+        return;
+      }
+      const phases: TugPhases | undefined = a?.phases ?? live.phases() ?? undefined;
+      void playCue(lang, "done", lang === "es" ? "Listo" : "Done");
+      const r: TugResult = {
+        totalS: Math.round(totalS * 10) / 10,
+        source: "auto",
+        ...(phases ? { phases } : {}),
+        verySlow: totalS >= VERY_SLOW_S,
+        fpsMedian,
+        gatesPassed,
+        camera,
+      };
+      setSaved(r);
+      onSaved(r);
+    } else {
+      void playCue(lang, "stop", t.cueStop);
+      const a = analyzeChairStand(stream.current);
+      const live = chairDet.current!;
+      const count = a?.count ?? live.count;
+      const armsUsed = a?.armsUsed ?? live.armsUsed;
+      if (count === 0 && !armsUsed && !gatesPassed) {
+        setFailMsg(t.failNoCount);
+        setPhase("failed");
+        return;
+      }
+      const r: ChairResult = {
+        count,
+        armsUsed,
+        halfwayCounted: a?.halfwayCounted ?? live.halfwayCounted,
+        source: "auto",
+        fpsMedian,
+        gatesPassed,
+        camera,
+      };
+      setSaved(r);
+      onSaved(r);
+    }
+    setPhase("done");
   };
+
+  const elapsedRef = () => (goT.current === null ? 0 : (performance.now() - goT.current) / 1000);
 
   const abort = () => {
     cam.stopRecording();
@@ -151,60 +245,13 @@ export function TestRunner({
     setPhase("aborted");
   };
 
-  const reset = () => {
+  const redo = () => {
     goT.current = null;
-    gateSince.current = null;
-    setGateHeldMs(0);
-    setElapsed(0);
-    setAuto(null);
-    setManualS(null);
-    setTimeText("");
-    setObs([]);
-    setUnsteady(null);
-    setCountText("");
-    setArms(null);
     setSaved(null);
-    setNoCam(false);
-    setPhase("position");
-    void cam.start("environment");
-  };
-
-  const gatesPassed = () => {
-    const { ok, total } = frameOk.current;
-    return total > 0 && ok / total >= 0.9;
-  };
-
-  const camInfo = () =>
-    noCam || !cam.camera ? undefined : { label: cam.camera.label, zoom: cam.camera.zoom, wide: cam.camera.wide };
-
-  const save = () => {
-    if (kind === "tug") {
-      const r: TugResult = {
-        totalS: Number(timeText),
-        source: auto?.totalS !== undefined ? "auto" : "manual",
-        manualS,
-        observations: obs,
-        lookedUnsteady: !!unsteady,
-        fpsMedian: fpsMedian.current,
-        gatesPassed: gatesPassed(),
-        camera: camInfo(),
-      };
-      setSaved(r);
-      onSaved(r);
-    } else {
-      const r: ChairResult = {
-        count: Number(countText),
-        armsUsed: !!arms,
-        source: auto?.count !== undefined ? "auto" : "manual",
-        manualCount: auto ? null : Number(countText),
-        fpsMedian: fpsMedian.current,
-        gatesPassed: gatesPassed(),
-        camera: camInfo(),
-      };
-      setSaved(r);
-      onSaved(r);
-    }
-    setPhase("done");
+    setElapsed(0);
+    setLiveCount(0);
+    setLivePhase("waiting");
+    openCamera();
   };
 
   const downloadStream = () => {
@@ -217,13 +264,10 @@ export function TestRunner({
     URL.revokeObjectURL(a.href);
   };
 
-  const timeValid = timeText !== "" && Number(timeText) > 0 && Number(timeText) < 300;
-  const countValid = countText !== "" && Number.isInteger(Number(countText)) && Number(countText) >= 0 && Number(countText) <= 40;
-  const entryDone = kind === "tug" ? timeValid && unsteady !== null : countValid && arms !== null;
-
   const name = kind === "tug" ? t.tugName : t.chairName;
   const instr = kind === "tug" ? t.tugInstr : t.chairInstr;
   const gateReady = gateHeldMs >= GATE_HOLD_MS;
+  const showCam = phase === "position" || phase === "instructions" || phase === "countdown" || phase === "running";
 
   return (
     <section>
@@ -233,7 +277,7 @@ export function TestRunner({
       {phase === "intro" && (
         <>
           <p className="muted">{kind === "tug" ? t.tugWhat : t.chairWhat}</p>
-          <ol className="steps">
+          <ol className="steps big-steps">
             {instr.map((s, i) => <li key={i}>{s}</li>)}
           </ol>
           <h2>{t.placementTitle}</h2>
@@ -242,24 +286,15 @@ export function TestRunner({
           <p className="note">{t.spotterTip}</p>
           <div className="row nav">
             <button className="btn secondary" onClick={() => onSkip("user skipped")}>{t.skipTest}</button>
-            <button
-              className="btn"
-              onClick={() => {
-                unlockAudio();
-                setPhase("position");
-                void cam.start("environment");
-              }}
-            >
-              {t.checkPosition}
-            </button>
+            <button className="btn" onClick={openCamera}>{t.checkPosition}</button>
           </div>
         </>
       )}
 
-      {(phase === "position" || phase === "countdown" || phase === "running") && (
+      {showCam && (
         <>
           {cam.status === "loading" && <p className="muted">{t.loadingCamera}</p>}
-          {cam.error && !noCam && <p className="note bad">{t.cameraError} {cam.error}</p>}
+          {cam.error && <p className="note bad">{t.cameraError} {cam.error}</p>}
           <CameraStage
             videoRef={cam.videoRef}
             canvasRef={cam.canvasRef}
@@ -267,10 +302,15 @@ export function TestRunner({
               phase === "countdown" ? (
                 <div className="big-readout">{countdown}</div>
               ) : phase === "running" ? (
-                <div className="big-readout">
-                  {kind === "chair"
-                    ? Math.max(0, Math.ceil(ALGO.chairStandWindowS - elapsed))
-                    : elapsed.toFixed(1)}
+                <div className="live-hud">
+                  <div className="big-readout">
+                    {kind === "chair" ? liveCount : elapsed.toFixed(1)}
+                  </div>
+                  <div className="live-label">
+                    {kind === "chair"
+                      ? `${Math.max(0, Math.ceil(30 - elapsed))} s`
+                      : t.phaseNames[livePhase]}
+                  </div>
                 </div>
               ) : null
             }
@@ -283,29 +323,48 @@ export function TestRunner({
           {cam.camera && (
             <p className="camline">
               {cam.camera.wide ? t.camWide : t.camNormal}{" "}
-              <button className="linkish" onClick={() => void cam.switchCamera()}>{t.camSwitch}</button>
+              <button className="linkish" onClick={() => { fx.current = null; void cam.switchCamera(); }}>{t.camSwitch}</button>
             </p>
           )}
           <GateBadges gates={cam.gates} t={t} />
+          <ul className="gates">
+            <li className={seated ? "ok" : "bad"}>
+              <span aria-hidden>{seated ? "✓" : "✗"}</span> {seated ? t.gateSeated : t.gateNotSeated}
+            </li>
+            {kind === "chair" && (
+              <li className={armsCrossed ? "ok" : "bad"}>
+                <span aria-hidden>{armsCrossed ? "✓" : "✗"}</span> {armsCrossed ? t.gateArms : t.gateNoArms}
+              </li>
+            )}
+          </ul>
           {!gateReady && cam.status === "running" && <p className="muted">{t.gatesWaiting}</p>}
           <div className="row nav">
             <button className="btn secondary" onClick={() => { cam.stop(); setPhase("intro"); }}>{t.back}</button>
-            <button className="btn" disabled={!gateReady} onClick={beginCountdown}>{t.startTest}</button>
+            <button className="btn" disabled={!gateReady} onClick={begin}>{t.startTest}</button>
           </div>
-          <button className="linkish" onClick={() => { setNoCam(true); cam.stop(); void beginCountdown(); }}>
-            {t.noCamera}
-          </button>
         </>
       )}
 
-      {phase === "countdown" && <p className="instruction">{t.countdownReady}</p>}
+      {phase === "instructions" && (
+        <>
+          <p className="instruction">{t.readingInstr}</p>
+          <ol className="steps big-steps">
+            {instr.map((s, i) => <li key={i}>{s}</li>)}
+          </ol>
+          <button className="btn danger" onClick={abort}>{t.abort}</button>
+        </>
+      )}
+
+      {phase === "countdown" && (
+        <>
+          <p className="instruction">{t.countdownReady}</p>
+          <button className="btn danger" onClick={abort}>{t.abort}</button>
+        </>
+      )}
 
       {phase === "running" && (
         <>
           <p className="instruction">{kind === "tug" ? t.tugRunning : t.chairRunning}</p>
-          {kind === "tug" && (
-            <button className="btn huge" onClick={finishRun}>{t.tugSatDown}</button>
-          )}
           <button className="btn danger" onClick={abort}>{t.abort}</button>
         </>
       )}
@@ -315,122 +374,80 @@ export function TestRunner({
           <p className="note">{t.aborted}</p>
           <div className="row nav">
             <button className="btn secondary" onClick={() => onSkip("stopped for safety")}>{t.skipTest}</button>
-            <button className="btn" onClick={reset}>{t.redo}</button>
+            <button className="btn" onClick={redo}>{t.redo}</button>
           </div>
         </>
       )}
 
-      {phase === "entry" && (
+      {phase === "failed" && (
         <>
-          <p className="note">{auto ? t.autoMeasured : t.autoNone}</p>
-          {kind === "tug" ? (
-            <>
-              <label className="field">
-                <span>{t.tugTimeLabel}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  value={timeText}
-                  onChange={(e) => setTimeText(e.target.value)}
-                />
-              </label>
-              {manualS !== null && <p className="muted small">{t.tugYourTap} {manualS.toFixed(1)} s</p>}
-              <div className="field">
-                <span>{t.tugObsTitle}</span>
-                <ul className="checklist compact">
-                  {Object.entries(t.tugObs).map(([k, label]) => (
-                    <li key={k}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={obs.includes(k)}
-                          onChange={(e) =>
-                            setObs((o) => (e.target.checked ? [...o, k] : o.filter((x) => x !== k)))
-                          }
-                        />
-                        <span>{label}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="question">
-                <p>{t.tugUnsteadyQ}</p>
-                <div className="choices">
-                  {[true, false].map((v) => (
-                    <button key={String(v)} type="button" className={`choice ${unsteady === v ? "selected" : ""}`} onClick={() => setUnsteady(v)}>
-                      {v ? t.yes : t.no}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <label className="field">
-                <span>{t.chairCountLabel}</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={countText}
-                  onChange={(e) => setCountText(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                />
-              </label>
-              <p className="muted small">{t.chairHalfway}</p>
-              <div className="question">
-                <p>{t.chairArmsQ}</p>
-                <div className="choices">
-                  {[true, false].map((v) => (
-                    <button key={String(v)} type="button" className={`choice ${arms === v ? "selected" : ""}`} onClick={() => setArms(v)}>
-                      {v ? t.yes : t.no}
-                    </button>
-                  ))}
-                </div>
-                {arms && <p className="note">{t.chairArmsNote}</p>}
-              </div>
-            </>
-          )}
-          <div className="row nav">
-            <button className="btn secondary" onClick={reset}>{t.redo}</button>
-            <button className="btn" disabled={!entryDone} onClick={save}>{t.saveResult}</button>
+          <div className="card warn">
+            <p className="big">{t.failTitle}</p>
+            <p>{failMsg}</p>
           </div>
+          <div className="row nav">
+            <button className="btn secondary" onClick={() => onSkip("could not measure")}>{t.skipTest}</button>
+            <button className="btn" onClick={redo}>{t.redo}</button>
+          </div>
+          {stream.current && <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>}
         </>
       )}
 
       {phase === "done" && saved && (
         <>
+          <p className="note">{t.autoMeasured}</p>
           {"totalS" in saved ? (
-            <div className={`card ${tugAtRisk(saved.totalS) ? "warn" : "okcard"}`}>
-              <p className="big">{saved.totalS.toFixed(1)} {t.seconds}</p>
-              <p>{tugAtRisk(saved.totalS) ? t.tugRiskYes : t.tugRiskNo}</p>
-            </div>
+            <>
+              <div className={`card ${tugAtRisk(saved.totalS) ? "warn" : "okcard"}`}>
+                <p className="big">{saved.totalS.toFixed(1)} {t.seconds}</p>
+                <p>{tugAtRisk(saved.totalS) ? t.tugRiskYes : t.tugRiskNo}</p>
+              </div>
+              {saved.phases && <PhaseBars phases={saved.phases} t={t} />}
+            </>
           ) : (
             (() => {
               const sc = scoreChairStand(saved.count, saved.armsUsed, age, sex);
               return (
                 <div className={`card ${sc.belowAverage ? "warn" : "okcard"}`}>
                   <p className="big">{sc.score}</p>
+                  {saved.armsUsed && <p><b>{t.armsUsedResult}</b></p>}
+                  {saved.halfwayCounted && <p className="small">{t.halfwayNote}</p>}
                   <p>
-                    {sc.norm === null
-                      ? t.chairNoNorm
-                      : sc.belowAverage
-                        ? t.chairBelow(sc.norm)
-                        : t.chairOk(sc.norm)}
+                    {sc.norm === null ? t.chairNoNorm : sc.belowAverage ? t.chairBelow(sc.norm) : t.chairOk(sc.norm)}
                   </p>
                 </div>
               );
             })()
           )}
           <div className="row nav">
-            <button className="btn secondary" onClick={reset}>{t.redo}</button>
+            <button className="btn secondary" onClick={redo}>{t.redo}</button>
             <button className="btn" onClick={onNext}>{kind === "tug" ? t.next : t.seeResults}</button>
           </div>
-          {stream.current && (
-            <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>
-          )}
+          {stream.current && <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>}
         </>
       )}
     </section>
+  );
+}
+
+export function PhaseBars({ phases, t }: { phases: TugPhases; t: (typeof STRINGS)["en"] }) {
+  const keys = ["standUp", "walkOut", "turn", "walkBack", "sitDown"] as const;
+  const total = keys.reduce((a, k) => a + phases[k], 0) || 1;
+  return (
+    <div className="phases">
+      <p className="small"><b>{t.phasesTitle}</b></p>
+      <div className="phase-bar">
+        {keys.map((k) => (
+          <span key={k} className={`ph ph-${k}`} style={{ width: `${(phases[k] / total) * 100}%` }} />
+        ))}
+      </div>
+      <ul className="phase-legend">
+        {keys.map((k) => (
+          <li key={k}>
+            <span className={`dot ph-${k}`} /> {t.phaseShort[k]} <b>{phases[k].toFixed(1)} s</b>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
