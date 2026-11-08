@@ -20,7 +20,14 @@ export type CueId =
   | "tugInstr"
   | "chairInstr"
   | "done"
-  | "armsUsed";
+  | "armsUsed"
+  | "balIntro"
+  | "bal1"
+  | "bal2"
+  | "bal3"
+  | "bal4"
+  | "hold"
+  | "good";
 
 const cache = new Map<string, HTMLAudioElement | null>();
 

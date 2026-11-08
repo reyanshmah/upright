@@ -21,6 +21,8 @@ export interface ReportFacts {
   chairNorm: number | null;
   chairBelow: boolean | null;
   armsUsed: boolean | null;
+  /** null = balance test not done */
+  balanceAtRisk: boolean | null;
   injuredFall: boolean;
   multipleFalls: boolean;
   higherRisk: boolean;
@@ -30,6 +32,8 @@ export function reportFacts(s: SessionState): ReportFacts {
   const tug = s.tug && !isSkipped(s.tug) ? s.tug : null;
   const chair = s.chair && !isSkipped(s.chair) ? s.chair : null;
   const sc = chair ? scoreChairStand(chair.count, chair.armsUsed, s.profile.age, s.profile.sex) : null;
+  const bal = s.balance && !isSkipped(s.balance) ? s.balance : null;
+  const balRisk = bal ? !bal.tandemHeld10 : null;
   const screen = screenedAtRisk(s.screening);
   const tRisk = tug ? tugAtRisk(tug.totalS) : null;
   const cBelow = sc ? sc.belowAverage : null;
@@ -41,9 +45,10 @@ export function reportFacts(s: SessionState): ReportFacts {
     chairNorm: sc ? sc.norm : null,
     chairBelow: cBelow,
     armsUsed: chair ? chair.armsUsed : null,
+    balanceAtRisk: balRisk,
     injuredFall: !!s.screening.injured,
     multipleFalls: s.screening.fallCount === "2" || s.screening.fallCount === "3+",
-    higherRisk: screen || tRisk === true || cBelow === true,
+    higherRisk: screen || tRisk === true || cBelow === true || balRisk === true,
   };
 }
 
@@ -53,7 +58,7 @@ export function stepOrder(f: ReportFacts): StepKey[] {
   const order: StepKey[] = ["doctor"];
   // A weak test result moves exercise up. (With TUG phases, the weakest phase
   // will pick strength vs. balance wording here.)
-  if (f.chairBelow || f.tugAtRisk) order.push("exercise", "meds", "home");
+  if (f.chairBelow || f.tugAtRisk || f.balanceAtRisk) order.push("exercise", "meds", "home");
   else order.push("meds", "exercise", "home");
   return order;
 }

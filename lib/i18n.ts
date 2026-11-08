@@ -122,7 +122,7 @@ const en = {
   gatesWaiting: "Waiting until everything is green…",
 
   // Tests shared
-  testOf: (n: number) => `Test ${n} of 2`,
+  testOf: (n: number) => `Test ${n} of 3`,
   placementTitle: "Phone placement",
   checkPosition: "Check the camera view",
   startTest: "Start test",
@@ -225,6 +225,36 @@ const en = {
   chairNoNorm: "No CDC comparison for this age (the table covers 60–94).",
 
   seeResults: "See results",
+  // 4-Stage Balance
+  balName: "4-Stage Balance Test",
+  balWhat: "Measures standing balance. Four positions, each harder than the last. Hold each one for 10 seconds.",
+  balPlace: "Phone in FRONT of them, about 2 m away, at hip height, upright or sideways. The whole body from head to feet must show. Stand near a wall or counter for safety, but don't hold it.",
+  balRules: [
+    "You can hold your arms out or move your body to keep your balance, but don't move your feet.",
+    "If you can't hold a position for 10 seconds, the test stops there. That's OK.",
+  ],
+  balStages: {
+    1: "Stand with your feet side by side.",
+    2: "Put the instep of one foot so it touches the big toe of the other foot.",
+    3: "Put one foot right in front of the other, heel touching toe.",
+    4: "Stand on one foot.",
+  } as Record<1 | 2 | 3 | 4, string>,
+  balStageLabel: (n: number) => `Position ${n} of 4`,
+  balSpokenIntro: "I will show you four positions. Try to stand in each position for ten seconds. You can hold your arms out, but don't move your feet.",
+  balGetInto: "Get into this position…",
+  balHold: "Hold",
+  balHoldLabel: "Holding",
+  balGood: "Good",
+  balHeld: (s: string) => `Held ${s} s`,
+  balFoot: "Feet moved",
+  balLost: "The camera lost sight of the feet. Check the whole body is in view and redo the test.",
+  balUnverified: "position not confirmed by camera",
+  balTandemOk: "Held the tandem stance for 10 seconds.",
+  balTandemRisk: "Could not hold the tandem stance for 10 seconds: at increased risk of falling (CDC).",
+  balSkipSlow: "The first test took 20 seconds or more. To be safe, we suggest skipping this test.",
+  gateStanding: "Standing up straight",
+  gateNotStanding: "Stand up, facing the phone",
+
 };
 
 export type Strings = typeof en;
@@ -341,7 +371,7 @@ const es: Strings = {
   gateFpsBad: "La cámara va lenta — cierre otras apps o use mejor luz",
   gatesWaiting: "Esperando a que todo esté en verde…",
 
-  testOf: (n: number) => `Prueba ${n} de 2`,
+  testOf: (n: number) => `Prueba ${n} de 3`,
   placementTitle: "Dónde poner el teléfono",
   checkPosition: "Revisar la vista de la cámara",
   startTest: "Empezar la prueba",
@@ -442,6 +472,35 @@ const es: Strings = {
   chairNoNorm: "No hay comparación de los CDC para esta edad (la tabla cubre de 60 a 94).",
 
   seeResults: "Ver resultados",
+  balName: "Prueba de equilibrio en 4 etapas",
+  balWhat: "Mide el equilibrio de pie. Cuatro posiciones, cada una más difícil. Mantenga cada una durante 10 segundos.",
+  balPlace: "Teléfono ENFRENTE de la persona, a unos 2 m, a la altura de la cadera, vertical u horizontal. Debe verse todo el cuerpo, de la cabeza a los pies. Párese cerca de una pared o mostrador por seguridad, pero sin apoyarse.",
+  balRules: [
+    "Puede extender los brazos o mover el cuerpo para mantener el equilibrio, pero no mueva los pies.",
+    "Si no puede mantener una posición 10 segundos, la prueba termina ahí. Está bien.",
+  ],
+  balStages: {
+    1: "Párese con los pies juntos, uno al lado del otro.",
+    2: "Ponga el arco de un pie tocando el dedo gordo del otro pie.",
+    3: "Ponga un pie justo delante del otro, el talón tocando la punta.",
+    4: "Párese en un solo pie.",
+  },
+  balStageLabel: (n: number) => `Posición ${n} de 4`,
+  balSpokenIntro: "Le voy a mostrar cuatro posiciones. Trate de mantener cada una durante diez segundos. Puede extender los brazos, pero no mueva los pies.",
+  balGetInto: "Póngase en esta posición…",
+  balHold: "Mantenga",
+  balHoldLabel: "Manteniendo",
+  balGood: "Muy bien",
+  balHeld: (s: string) => `Mantuvo ${s} s`,
+  balFoot: "Movió los pies",
+  balLost: "La cámara dejó de ver los pies. Revise que se vea todo el cuerpo y repita la prueba.",
+  balUnverified: "posición no confirmada por la cámara",
+  balTandemOk: "Mantuvo la posición en tándem durante 10 segundos.",
+  balTandemRisk: "No pudo mantener la posición en tándem 10 segundos: mayor riesgo de caídas (CDC).",
+  balSkipSlow: "La primera prueba tomó 20 segundos o más. Por seguridad, sugerimos saltar esta prueba.",
+  gateStanding: "De pie y derecho/a",
+  gateNotStanding: "Póngase de pie, mirando al teléfono",
+
 };
 
 export const STRINGS: Record<Lang, Strings> = { en, es };

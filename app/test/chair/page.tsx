@@ -40,10 +40,10 @@ export default function ChairPage() {
             className="choice selected"
             onClick={() => {
               updateSession({ chair: { skipped: true, reason: "TUG took 20 s or more (safety)" } });
-              router.push("/results");
+              router.push("/test/balance");
             }}
           >
-            {t.skipTest} → {t.seeResults}
+            {t.skipTest}
           </button>
           <button className="choice" onClick={() => setOverride(true)}>{t.doAnyway}</button>
         </div>
@@ -65,9 +65,9 @@ export default function ChairPage() {
         onSaved={(r) => updateSession({ chair: r as ChairResult })}
         onSkip={(reason) => {
           updateSession({ chair: { skipped: true, reason } });
-          router.push("/results");
+          router.push("/test/balance");
         }}
-        onNext={() => router.push("/results")}
+        onNext={() => router.push("/test/balance")}
       />
       <p className="disclaimer">{t.disclaimer}</p>
     </main>

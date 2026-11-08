@@ -61,6 +61,24 @@ export interface ChairResult {
   camera?: CameraInfo;
 }
 
+export interface BalanceStageResult {
+  stage: 1 | 2 | 3 | 4;
+  heldS: number;
+  completed: boolean;
+  stanceVerified: boolean;
+  sway: number | null;
+}
+
+export interface BalanceResult {
+  stages: BalanceStageResult[];
+  /** CDC: tandem stance (stage 3) held 10 s. */
+  tandemHeld10: boolean;
+  source: Source;
+  fpsMedian: number | null;
+  gatesPassed: boolean;
+  camera?: CameraInfo;
+}
+
 export interface SetupInfo {
   safetyConfirmed: boolean;
   /** How the 3 m line was laid out. */
@@ -77,6 +95,7 @@ export interface SessionState {
   setup?: SetupInfo;
   tug?: TugResult | { skipped: true; reason: string };
   chair?: ChairResult | { skipped: true; reason: string };
+  balance?: BalanceResult | { skipped: true; reason: string };
   createdAt: string;
 }
 

@@ -421,7 +421,7 @@ export function TestRunner({
           )}
           <div className="row nav">
             <button className="btn secondary" onClick={redo}>{t.redo}</button>
-            <button className="btn" onClick={onNext}>{kind === "tug" ? t.next : t.seeResults}</button>
+            <button className="btn" onClick={onNext}>{t.next}</button>
           </div>
           {stream.current && <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>}
         </>

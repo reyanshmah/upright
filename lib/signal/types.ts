@@ -22,6 +22,8 @@ export interface LandmarkStream {
   videoWidth: number;
   videoHeight: number;
   frames: PoseFrame[];
+  /** Test events (e.g. balance stage/hold starts), for replaying the recording. */
+  events?: { t: number; type: string; stage?: number }[];
 }
 
 /** MediaPipe Pose landmark indices used by Upright. */

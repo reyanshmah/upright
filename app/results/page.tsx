@@ -18,6 +18,9 @@ const R = {
     screen: "Screening questions",
     tug: "Timed Up and Go",
     chair: "30-Second Chair Stand",
+    balance: "4-Stage Balance",
+    tandemOk: "Tandem held 10 s",
+    tandemNo: "Tandem under 10 s",
     atRisk: "At risk",
     ok: "OK",
     below: "Below average",
@@ -38,6 +41,9 @@ const R = {
     screen: "Preguntas de detección",
     tug: "Levántate y Anda",
     chair: "Levantarse de la silla (30 s)",
+    balance: "Equilibrio en 4 etapas",
+    tandemOk: "Tándem 10 s",
+    tandemNo: "Tándem menos de 10 s",
     atRisk: "En riesgo",
     ok: "Bien",
     below: "Bajo el promedio",
@@ -79,6 +85,8 @@ export default function Results() {
   const yesCount = [s.screening.unsteady, s.screening.worry, s.screening.fallen].filter(Boolean).length;
   const tug = s.tug && !isSkipped(s.tug) ? s.tug : null;
   const chair = s.chair && !isSkipped(s.chair) ? s.chair : null;
+  const bal = s.balance && !isSkipped(s.balance) ? s.balance : null;
+  const balReached = bal ? Math.max(0, ...bal.stages.filter((x) => x.completed).map((x) => x.stage)) : 0;
   const name = s.profile.firstName;
   const date = new Date(s.createdAt);
 
@@ -136,6 +144,12 @@ export default function Results() {
                 : <>{f.chairScore} {f.chairBelow === null
                     ? chip("na", r.noNorm)
                     : chip(f.chairBelow ? "risk" : "ok", f.chairBelow ? r.below : r.ok)}</>}
+            </span>
+          </li>
+          <li>
+            <span>{r.balance}</span>
+            <span>
+              {!bal ? chip("na", r.skipped) : chip(bal.tandemHeld10 ? "ok" : "risk", bal.tandemHeld10 ? r.tandemOk : r.tandemNo)}
             </span>
           </li>
         </ul>
@@ -210,19 +224,33 @@ export default function Results() {
               </td>
             </tr>
             <tr>
+              <th>4-Stage Balance</th>
+              <td>
+                {bal ? (
+                  <>
+                    {bal.stages.map((x) => `Stage ${x.stage}: ${x.heldS.toFixed(1)} s${x.completed ? "" : " (feet moved)"}${x.stanceVerified ? "" : " (stance not camera-confirmed)"}${x.sway !== null ? `, sway ${x.sway.toFixed(3)} hip widths` : ""}`).join(" · ")}
+                    {" "}→ <b>{bal.tandemHeld10 ? "tandem held 10 s" : "could not hold tandem 10 s: increased fall risk (CDC)"}</b>
+                    {` · highest position completed: ${balReached || "none"}`}
+                  </>
+                ) : (
+                  `Not done (${s.balance && isSkipped(s.balance) ? s.balance.reason : "—"})`
+                )}
+              </td>
+            </tr>
+            <tr>
               <th>Quality</th>
               <td>
                 Camera gates (whole body, one person, ≥15 fps) passed during TUG: {tug ? (tug.gatesPassed ? "yes" : "no") : "—"}, chair stand: {chair ? (chair.gatesPassed ? "yes" : "no") : "—"} ·
                 Median fps: {tug?.fpsMedian ? tug.fpsMedian.toFixed(0) : "—"} / {chair?.fpsMedian ? chair.fpsMedian.toFixed(0) : "—"} ·
                 3 m line: {s.setup?.lineMethod === "ar" ? `phone AR (ARCore), ${s.setup.cameraMeasuredM?.toFixed(2)} m` : s.setup?.lineMethod === "tape" ? "tape measure" : "—"} ·
-                Camera: {[tug?.camera, chair?.camera].filter(Boolean).map((c) => `${c!.wide ? "wide " : ""}${c!.zoom ? `${c!.zoom}× ` : ""}${c!.label || "back camera"}`).filter((v, i, a) => a.indexOf(v) === i).join("; ") || "—"}
+                Camera: {[tug?.camera, chair?.camera, bal?.camera].filter(Boolean).map((c) => `${c!.wide ? "wide " : ""}${c!.zoom ? `${c!.zoom}× ` : ""}${c!.label || "back camera"}`).filter((v, i, a) => a.indexOf(v) === i).join("; ") || "—"}
               </td>
             </tr>
           </tbody>
         </table>
         <p className="small">
           Home screening aid, not a diagnosis. Thresholds from CDC STEADI forms (TUG ≥ 12 s; 30-Second Chair Stand
-          below-average scores by age and sex). Administered at home by a non-clinician.
+          below-average scores by age and sex; 4-Stage Balance tandem stance &lt; 10 s). Administered at home by a non-clinician.
         </p>
       </section>
 

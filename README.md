@@ -14,6 +14,7 @@ Built for DSH Hacks V2.
 | Safety checklist (`/setup`) | Done |
 | 3 m line: camera measurement (pose + person's height) or tape | Done (camera accuracy not yet validated) |
 | Test 1 TUG + Test 2 chair stand (`/test/tug`, `/test/chair`): instructions, placement diagram, live gates, countdown + "Go" cue, timer, safety stop, manual entry, CDC observations | Done |
+| 4-Stage Balance (`/test/balance`): spoken stages, stance check, automatic 10 s holds, feet-moved detection, sway; CDC tandem < 10 s rule | Done (tested on synthetic streams; needs real-video validation) |
 | Results (`/results`): family action plan (EN/ES template) + printable clinician summary + anonymous data download | Done |
 | CDC thresholds: TUG >= 12 s, chair-stand norms 60–94, arms used = 0 | Done |
 | Automatic TUG (auto-stop when seated, 5 phases) and chair stand (count, CDC halfway rule, arm use) — `lib/analysis/` | Done (tested on synthetic streams; needs real-video validation) |
