@@ -81,5 +81,5 @@ export const ALGO = {
   /** Minimum live frame rate for a test to be scored. */
   minFps: 15,
   /** Minimum landmark visibility for the whole-body gate. */
-  minVisibility: 0.5,
+  minVisibility: 0.4,
 } as const;

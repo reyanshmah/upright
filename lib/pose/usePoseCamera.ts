@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { createPoseLandmarker, SKELETON_EDGES, type ModelVariant } from "./landmarker";
-import { wholeBodyVisible } from "../signal/geometry";
+import { missingParts, type BodyPart } from "../signal/geometry";
+import { StableFlag } from "../signal/gate";
 import { ALGO } from "../signal/thresholds";
 import type { Landmark, PoseFrame } from "../signal/types";
 
@@ -71,17 +72,23 @@ export interface FrameInfo {
   w: number;
   h: number;
   fps: number;
+  /** Smoothed (hysteresis) gate result for this frame. */
+  gatesOk: boolean;
+  bodyOk: boolean;
+  fpsOk: boolean;
 }
 
 export interface Gates {
   fps: number;
   people: number;
   bodyVisible: boolean;
+  /** Parts out of view right now (for the hint), smoothed with bodyVisible. */
+  missing: BodyPart[];
   /** All gates pass: >= 15 fps, exactly one person, whole body in frame. */
   ok: boolean;
 }
 
-const NO_GATES: Gates = { fps: 0, people: 0, bodyVisible: false, ok: false };
+const NO_GATES: Gates = { fps: 0, people: 0, bodyVisible: false, missing: [], ok: false };
 
 /**
  * Camera + on-device pose + skeleton overlay + live gates + recording.
@@ -97,6 +104,10 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const frameTimes = useRef<number[]>([]);
   const recording = useRef<PoseFrame[] | null>(null);
   const fpsLog = useRef<number[]>([]);
+  const bodyFlag = useRef(new StableFlag(300, 600));
+  const personFlag = useRef(new StableFlag(300, 600));
+  const fpsFlag = useRef(new StableFlag(500, 1000));
+  const lastMissing = useRef<BodyPart[]>([]);
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
@@ -162,8 +173,13 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
       const fps = ft.length > 1 ? ((ft.length - 1) * 1000) / (t - ft[0]) : 0;
 
       const main = people[0] ?? null;
-      const bodyVisible = main ? wholeBodyVisible(main, ALGO.minVisibility) : false;
-      const ok = fps >= ALGO.minFps && people.length === 1 && bodyVisible;
+      const missingNow: BodyPart[] = main ? missingParts(main, ALGO.minVisibility) : ["hips", "knees", "feet"];
+      // Smoothed gates: no flicker when a value hovers at its threshold.
+      const bodyVisible = bodyFlag.current.update(missingNow.length === 0, t);
+      const onePerson = personFlag.current.update(people.length === 1, t);
+      const fpsOk = fpsFlag.current.update(fps >= ALGO.minFps, t);
+      if (bodyVisible || missingNow.length) lastMissing.current = bodyVisible ? [] : missingNow;
+      const ok = fpsOk && onePerson && bodyVisible;
 
       if (recording.current) {
         recording.current.push({
@@ -176,8 +192,14 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
       }
 
       draw(people, w, h, ok);
-      setGates({ fps, people: people.length, bodyVisible, ok });
-      onFrameRef.current?.({ t, main, people: people.length, w, h, fps });
+      setGates({
+        fps: fpsOk ? Math.max(fps, ALGO.minFps) : Math.min(fps, ALGO.minFps - 0.1),
+        people: onePerson ? 1 : people.length === 1 ? 0 : people.length,
+        bodyVisible,
+        missing: lastMissing.current,
+        ok,
+      });
+      onFrameRef.current?.({ t, main, people: people.length, w, h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk });
     }
     rafRef.current = requestAnimationFrame(loop);
   }, []);

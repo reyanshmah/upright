@@ -25,7 +25,11 @@ export function CameraStage({
 /** Plain-language gate badges for the helper. */
 export function GateBadges({ gates, t }: { gates: Gates; t: Strings }) {
   const items = [
-    { ok: gates.bodyVisible, good: t.gateBodyOk, bad: t.gateBodyBad },
+    {
+      ok: gates.bodyVisible,
+      good: t.gateBodyOk,
+      bad: gates.missing.length ? t.gateMissing(gates.missing.map((m) => t.parts[m])) : t.gateBodyBad,
+    },
     { ok: gates.people === 1, good: t.gateOnePerson, bad: gates.people === 0 ? t.gateNoPerson : t.gateTwoPeople },
     { ok: gates.fps >= 15, good: t.gateFpsOk, bad: t.gateFpsBad },
   ];

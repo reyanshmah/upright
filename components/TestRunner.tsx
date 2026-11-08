@@ -9,7 +9,6 @@ import { playCue, unlockAudio } from "@/lib/voice";
 import { analyzeChairStand, analyzeTug } from "@/lib/analysis";
 import type { LandmarkStream, PoseFrame } from "@/lib/signal/types";
 import type { ChairResult, TugResult } from "@/lib/session";
-import { wholeBodyVisible } from "@/lib/signal/geometry";
 import { scoreChairStand, tugAtRisk, ALGO, type Sex } from "@/lib/signal/thresholds";
 
 type Kind = "tug" | "chair";
@@ -62,8 +61,9 @@ export function TestRunner({
 
   const onFrame = (f: FrameInfo) => {
     const p = phaseRef.current;
-    const ok =
-      f.fps >= ALGO.minFps && f.people === 1 && !!f.main && wholeBodyVisible(f.main, ALGO.minVisibility);
+    // Before "Go": all gates, including one person in view.
+    // During the test the spotter walks beside them, so only body + fps count.
+    const ok = p === "position" ? f.gatesOk : f.bodyOk && f.fpsOk;
     if (p === "position") {
       if (ok) {
         gateSince.current ??= f.t;
@@ -239,6 +239,7 @@ export function TestRunner({
           <h2>{t.placementTitle}</h2>
           <p>{kind === "tug" ? t.tugPlace : t.chairPlace}</p>
           <SetupDiagram kind={kind} />
+          <p className="note">{t.spotterTip}</p>
           <div className="row nav">
             <button className="btn secondary" onClick={() => onSkip("user skipped")}>{t.skipTest}</button>
             <button

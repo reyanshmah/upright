@@ -41,17 +41,33 @@ export function bodyScalePx(lms: Landmark[], w: number, h: number): number {
   return (thigh("left") + thigh("right")) / 2;
 }
 
+export type BodyPart = "hips" | "knees" | "feet";
+
+const PAIRS: Record<BodyPart, [number, number]> = {
+  hips: [LM.leftHip, LM.rightHip],
+  knees: [LM.leftKnee, LM.rightKnee],
+  feet: [LM.leftAnkle, LM.rightAnkle],
+};
+
+function seen(p: Landmark | undefined, minVis: number, margin: number): boolean {
+  if (!p) return false;
+  const inFrame = p.x >= margin && p.x <= 1 - margin && p.y >= margin && p.y <= 1 - margin;
+  return (p.visibility ?? 0) >= minVis && inFrame;
+}
+
 /**
- * Whole-body gate: hips, knees and ankles all above the visibility threshold
- * AND inside the image. MediaPipe extrapolates joints that are out of frame
- * (y > 1), so visibility alone is not enough.
+ * Which body parts are NOT in view. In a side view the far leg is hidden
+ * behind the near one, so each part only needs ONE side (left or right)
+ * confidently visible and inside the image. MediaPipe extrapolates joints
+ * that are out of frame (y > 1), so visibility alone is not enough.
  */
-export function wholeBodyVisible(lms: Landmark[], minVis: number, margin = 0.01): boolean {
-  const idx = [LM.leftHip, LM.rightHip, LM.leftKnee, LM.rightKnee, LM.leftAnkle, LM.rightAnkle];
-  return idx.every((i) => {
-    const p = lms[i];
-    if (!p) return false;
-    const inFrame = p.x >= margin && p.x <= 1 - margin && p.y >= margin && p.y <= 1 - margin;
-    return (p.visibility ?? 0) >= minVis && inFrame;
-  });
+export function missingParts(lms: Landmark[], minVis: number, margin = 0.005): BodyPart[] {
+  return (Object.keys(PAIRS) as BodyPart[]).filter(
+    (part) => !PAIRS[part].some((i) => seen(lms[i], minVis, margin)),
+  );
+}
+
+/** Whole-body gate: hips, knees and feet each visible on at least one side. */
+export function wholeBodyVisible(lms: Landmark[], minVis: number, margin = 0.005): boolean {
+  return missingParts(lms, minVis, margin).length === 0;
 }
