@@ -41,8 +41,17 @@ export function bodyScalePx(lms: Landmark[], w: number, h: number): number {
   return (thigh("left") + thigh("right")) / 2;
 }
 
-/** Whole-body gate: hips, knees and ankles all above the visibility threshold. */
-export function wholeBodyVisible(lms: Landmark[], minVis: number): boolean {
+/**
+ * Whole-body gate: hips, knees and ankles all above the visibility threshold
+ * AND inside the image. MediaPipe extrapolates joints that are out of frame
+ * (y > 1), so visibility alone is not enough.
+ */
+export function wholeBodyVisible(lms: Landmark[], minVis: number, margin = 0.01): boolean {
   const idx = [LM.leftHip, LM.rightHip, LM.leftKnee, LM.rightKnee, LM.leftAnkle, LM.rightAnkle];
-  return idx.every((i) => (lms[i]?.visibility ?? 0) >= minVis);
+  return idx.every((i) => {
+    const p = lms[i];
+    if (!p) return false;
+    const inFrame = p.x >= margin && p.x <= 1 - margin && p.y >= margin && p.y <= 1 - margin;
+    return (p.visibility ?? 0) >= minVis && inFrame;
+  });
 }

@@ -17,28 +17,53 @@ export function tugAtRisk(totalSeconds: number): boolean {
 }
 
 /**
- * 30-Second Chair Stand below-average scores by age and sex.
- * TODO(before Nov 10): copy this table from the official CDC STEADI
- * 30-Second Chair Stand form. Left empty on purpose so nobody ships numbers
- * typed from memory. scoreChairStand() throws until it is filled in.
+ * 30-Second Chair Stand "Below Average Scores", copied from the CDC STEADI
+ * 30-Second Chair Stand assessment form (2017). A score BELOW the value is
+ * below average and "indicates a risk for falls."
+ *
+ * Form rules also encoded here:
+ * - Chair: straight back, no armrests, seat 17" high.
+ * - Arms crossed at the wrists on opposite shoulders. "If the patient must use
+ *   his/her arms to stand, stop the test. Record '0' for the number and score."
+ * - "If the patient is over halfway to a standing position when 30 seconds
+ *   have elapsed, count it as a stand."
  */
 export type Sex = "female" | "male";
 export interface ChairStandNorm {
   ageMin: number;
   ageMax: number;
-  /** A score BELOW this value is below average (per the CDC form wording). */
-  female: number;
+  /** A score BELOW this value is below average. */
   male: number;
+  female: number;
 }
-export const CHAIR_STAND_NORMS: ChairStandNorm[] = [];
+export const CHAIR_STAND_NORMS: ChairStandNorm[] = [
+  { ageMin: 60, ageMax: 64, male: 14, female: 12 },
+  { ageMin: 65, ageMax: 69, male: 12, female: 11 },
+  { ageMin: 70, ageMax: 74, male: 12, female: 10 },
+  { ageMin: 75, ageMax: 79, male: 11, female: 10 },
+  { ageMin: 80, ageMax: 84, male: 10, female: 9 },
+  { ageMin: 85, ageMax: 89, male: 8, female: 8 },
+  { ageMin: 90, ageMax: 94, male: 7, female: 4 },
+];
 
-export function chairStandBelowNorm(count: number, age: number, sex: Sex): boolean {
-  if (CHAIR_STAND_NORMS.length === 0) {
-    throw new Error("CHAIR_STAND_NORMS is empty: copy the table from the CDC STEADI form first.");
-  }
+export function chairStandNorm(age: number, sex: Sex): number | null {
   const row = CHAIR_STAND_NORMS.find((r) => age >= r.ageMin && age <= r.ageMax);
-  if (!row) throw new Error(`No CDC chair-stand norm for age ${age}`);
-  return count < row[sex];
+  return row ? row[sex] : null;
+}
+
+export interface ChairStandScore {
+  /** Score to record: 0 if arms were needed, per the CDC form. */
+  score: number;
+  /** Below-average cutoff for this age/sex, or null if the CDC table has no row. */
+  norm: number | null;
+  /** true = below average (risk); null = no CDC norm for this age. */
+  belowAverage: boolean | null;
+}
+
+export function scoreChairStand(count: number, armsUsed: boolean, age: number, sex: Sex): ChairStandScore {
+  const score = armsUsed ? 0 : count;
+  const norm = chairStandNorm(age, sex);
+  return { score, norm, belowAverage: norm === null ? null : score < norm };
 }
 
 /** Algorithm constants (from the execution plan; tune on saved streams). */

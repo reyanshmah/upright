@@ -10,16 +10,17 @@ Built for DSH Hacks V2.
 
 | Piece | State |
 | --- | --- |
-| Next.js app, mobile layout | Done |
-| On-device MediaPipe pose + live skeleton overlay (`/pose`) | Done |
-| Live FPS, people-in-frame and whole-body gates | Done |
-| Landmark-stream recording (JSON download) | Done |
-| One Euro filter, knee angle, body scale | Done |
-| Chair-stand state machine with hysteresis | Done (needs real-video tuning) |
-| CDC chair-stand norms table | **TODO: copy from the official CDC form** |
-| TUG timing and phases | TODO |
-| STEADI screening questions, safety checklist, setup check | TODO |
-| Voice prompts (EN/ES), reports, Supabase | TODO |
+| Onboarding (`/start`): language, who runs it, age/sex/height/walking aid, STEADI 3 key questions + fall follow-ups | Done (Spanish needs a fluent check) |
+| Safety checklist (`/setup`) | Done |
+| 3 m line: camera measurement (pose + person's height) or tape | Done (camera accuracy not yet validated) |
+| Test 1 TUG + Test 2 chair stand (`/test/tug`, `/test/chair`): instructions, placement diagram, live gates, countdown + "Go" cue, timer, safety stop, manual entry, CDC observations | Done |
+| Results (`/results`): family action plan (EN/ES template) + printable clinician summary + anonymous data download | Done |
+| CDC thresholds: TUG >= 12 s, chair-stand norms 60–94, arms used = 0 | Done |
+| **Automatic analysis of the recording** (`lib/analysis/index.ts`) | **Stub: rebuild at the hackathon** |
+| Pre-recorded voice MP3s (`public/audio/<lang>/<cue>.mp3`) | Browser speech placeholder |
+| Lighting gate, Claude-written report with number check, Supabase | TODO |
+
+**Where the analysis plugs in:** `analyzeTug()` and `analyzeChairStand()` in `lib/analysis/index.ts` receive the recorded landmark stream (with `goCueT` = time zero) after every test. Return `null` and the app uses the helper's tap/count; return a value and it becomes the measured result (the helper's number is kept for the stopwatch comparison).
 
 ## Run it
 
@@ -41,8 +42,20 @@ npm run build
 ```
 app/
   page.tsx            home
-  pose/page.tsx       camera check: skeleton overlay, gates, live stand count, recording
+  start/page.tsx      onboarding + STEADI screening questions
+  setup/page.tsx      safety checklist + 3 m line (camera or tape)
+  test/tug, test/chair  the two tests (shared components/TestRunner.tsx)
+  results/page.tsx    family action plan + clinician summary
+  pose/page.tsx       developer camera check
+components/           CameraStage, TestRunner, setup diagram
 lib/
+  i18n.ts             English/Spanish strings
+  session.ts          profile, answers, results (sessionStorage, stays on the phone)
+  measure.ts          3 m measurement math (height-scaled pixels per meter)
+  report.ts           family plan step order + EN/ES text
+  voice.ts            voice cues (MP3 if present, else browser speech)
+  analysis/index.ts   ANALYSIS SLOTS for the hackathon
+  pose/usePoseCamera.ts  camera + pose + gates + recording hook
   pose/landmarker.ts  MediaPipe Pose Landmarker (VIDEO mode, self-hosted wasm + model)
   signal/             pure functions of the landmark stream
     thresholds.ts     CDC thresholds (TUG >= 12 s) and algorithm constants

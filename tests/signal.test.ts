@@ -1,7 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { countChairStands, StandStateMachine } from "../lib/signal/chairStand";
 import { OneEuroFilter } from "../lib/signal/oneEuro";
-import { tugAtRisk } from "../lib/signal/thresholds";
+import { scoreChairStand, tugAtRisk } from "../lib/signal/thresholds";
+
+describe("CDC chair-stand norms", () => {
+  it("uses strict < against the CDC below-average table", () => {
+    expect(scoreChairStand(12, false, 72, "female").belowAverage).toBe(false); // < 10
+    expect(scoreChairStand(9, false, 72, "female").belowAverage).toBe(true);
+    expect(scoreChairStand(13, false, 62, "male").belowAverage).toBe(true); // < 14
+    expect(scoreChairStand(14, false, 62, "male").belowAverage).toBe(false);
+  });
+  it("records 0 if arms were needed", () => {
+    const r = scoreChairStand(15, true, 70, "male");
+    expect(r.score).toBe(0);
+    expect(r.belowAverage).toBe(true);
+  });
+  it("returns null outside the 60-94 table", () => {
+    expect(scoreChairStand(10, false, 55, "female").belowAverage).toBeNull();
+    expect(scoreChairStand(10, false, 96, "female").norm).toBeNull();
+  });
+});
 
 /** Synthetic knee-angle series: n stands, ~30 fps. */
 function stands(n: number, fps = 30, cycleS = 2.5) {
@@ -53,5 +71,17 @@ describe("One Euro filter", () => {
       if (i > 30) maxDev = Math.max(maxDev, Math.abs(y - 100));
     }
     expect(maxDev).toBeLessThan(3);
+  });
+});
+
+import { wholeBodyVisible } from "../lib/signal/geometry";
+describe("whole-body gate", () => {
+  const body = (y: number, vis: number) =>
+    Array.from({ length: 33 }, () => ({ x: 0.5, y, z: 0, visibility: vis }));
+  it("passes when legs are visible and in frame", () => {
+    expect(wholeBodyVisible(body(0.7, 0.9), 0.5)).toBe(true);
+  });
+  it("fails when MediaPipe places legs below the frame, even with high visibility", () => {
+    expect(wholeBodyVisible(body(1.6, 0.9), 0.5)).toBe(false);
   });
 });

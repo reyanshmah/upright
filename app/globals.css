@@ -53,3 +53,118 @@ p { margin: 0 0 16px; }
 .bad { color: var(--bad); }
 
 .disclaimer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid #ddd; padding-top: 12px; margin-top: 24px; }
+
+/* Onboarding */
+.progress { display: flex; gap: 6px; margin-bottom: 20px; }
+.progress span { flex: 1; height: 6px; border-radius: 3px; background: #ddd; }
+.progress span.on { background: var(--brand); }
+
+.choices { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+.choices.big .choice { font-size: 1.3rem; padding: 22px; }
+.choice {
+  text-align: left;
+  font: inherit;
+  font-size: 1.1rem;
+  padding: 16px 18px;
+  min-height: 56px;
+  border-radius: 12px;
+  border: 2px solid #cfd6d3;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+.choice.selected { border-color: var(--brand); background: #e3efed; font-weight: 600; }
+.question .choices, .field .choices { flex-direction: row; flex-wrap: wrap; }
+.question .choice, .field .choice { flex: 1 1 120px; text-align: center; }
+
+.field { display: block; margin: 18px 0; }
+.field > span { display: block; font-weight: 600; margin-bottom: 6px; }
+.field input {
+  width: 100%;
+  font: inherit;
+  font-size: 1.2rem;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid #cfd6d3;
+  background: #fff;
+}
+.field input:focus { outline: 3px solid var(--accent); border-color: var(--brand); }
+
+.question { margin: 20px 0; }
+.question p { font-size: 1.2rem; font-weight: 600; margin-bottom: 8px; }
+.followup { border-left: 4px solid var(--accent); padding-left: 14px; margin-left: 4px; }
+
+.note { background: #fff6e8; border-radius: 10px; padding: 10px 12px; font-size: 0.95rem; }
+.note.bad { background: #fde8e6; color: var(--bad); }
+.card { border-radius: 12px; padding: 16px; margin: 12px 0; background: var(--card); }
+.card.warn { border-left: 6px solid var(--accent); }
+.card.okcard { border-left: 6px solid var(--ok); }
+.nav { justify-content: space-between; margin-top: 24px; }
+
+/* Flow screens */
+h2 { font-size: 1.3rem; color: var(--brand); margin: 24px 0 8px; }
+.eyebrow { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; font-weight: 700; color: var(--accent); margin: 0 0 4px; }
+.small { font-size: 0.85rem; }
+.big { font-size: 1.35rem; font-weight: 700; margin: 0 0 6px; }
+.instruction { font-size: 1.2rem; font-weight: 600; margin: 12px 0; }
+.steps { padding-left: 1.3em; }
+.steps li { margin-bottom: 8px; }
+
+.checklist { list-style: none; padding: 0; margin: 12px 0; }
+.checklist li { margin: 8px 0; }
+.checklist label { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border-radius: 12px; padding: 14px; cursor: pointer; }
+.checklist input { width: 26px; height: 26px; flex: none; accent-color: var(--brand); margin-top: 2px; }
+.checklist.compact label { padding: 10px 12px; }
+
+.unit-toggle { display: inline-flex; border: 2px solid var(--brand); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.unit-toggle button { font: inherit; padding: 8px 14px; border: none; background: #fff; color: var(--brand); cursor: pointer; }
+.unit-toggle button.on { background: var(--brand); color: #fff; }
+.inline-inputs { display: flex; gap: 12px; }
+.inline-inputs label { display: flex; align-items: center; gap: 6px; flex: 1; }
+.inline-inputs input { width: 100%; font: inherit; font-size: 1.2rem; padding: 14px; border-radius: 12px; border: 2px solid #cfd6d3; }
+
+.stage-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.big-readout { font-size: clamp(3rem, 14vw, 6rem); font-weight: 800; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.7); }
+.big-readout.ok { color: #3ee08f; }
+.big-readout.bad { color: #ffb4a8; }
+
+.gates { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 6px; }
+.gates li { background: var(--card); border-radius: 10px; padding: 10px 12px; font-weight: 600; }
+.gates li.ok { color: var(--ok); }
+.gates li.bad { color: var(--bad); }
+
+.meter { height: 18px; background: #e3e7e5; border-radius: 9px; overflow: hidden; margin: 8px 0; }
+.meter-fill { height: 100%; background: var(--brand); transition: width 0.1s linear; }
+.meter-fill.ok { background: var(--ok); }
+.meter-fill.bad { background: var(--bad); }
+.meter-label { margin: 0 0 8px; }
+
+.btn.huge { display: block; width: 100%; font-size: 1.4rem; padding: 26px; margin: 12px 0; background: var(--ok); }
+.btn.danger { display: block; width: 100%; background: #fff; color: var(--bad); border: 2px solid var(--bad); margin: 8px 0; }
+.linkish { background: none; border: none; color: var(--brand); text-decoration: underline; font: inherit; font-size: 0.9rem; padding: 8px 0; cursor: pointer; }
+
+.diagram { width: 100%; max-width: 420px; display: block; margin: 8px 0 12px; color: var(--ink); background: var(--card); border-radius: 12px; }
+
+.summary { list-style: none; padding: 0; margin: 16px 0; }
+.summary li { display: flex; justify-content: space-between; gap: 12px; align-items: center; background: var(--card); border-radius: 10px; padding: 12px 14px; margin: 6px 0; flex-wrap: wrap; }
+.chip { display: inline-block; font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; margin-left: 6px; }
+.chip.risk { background: #fde8e6; color: var(--bad); }
+.chip.ok { background: #e2f3e8; color: var(--ok); }
+.chip.na { background: #eceeed; color: var(--muted); }
+.plan { padding-left: 1.3em; }
+.plan li { margin: 12px 0; }
+.plan p { margin: 4px 0 0; }
+
+.clinician { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-top: 28px; font-size: 0.9rem; }
+.clinician h2 { margin-top: 0; font-size: 1.1rem; }
+.clinician table { width: 100%; border-collapse: collapse; }
+.clinician th, .clinician td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid #eee; }
+.clinician th { width: 28%; white-space: nowrap; }
+
+@media print {
+  body { background: #fff; font-size: 12px; }
+  .btn, .linkish, .nav, .disclaimer { display: none !important; }
+  body[data-print="clinician"] .family { display: none; }
+  body[data-print="clinician"] .clinician { border: none; margin: 0; padding: 0; }
+  main { max-width: none; padding: 0; }
+}
