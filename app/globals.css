@@ -1,0 +1,55 @@
+:root {
+  --bg: #f6f4ef;
+  --ink: #1b1f1e;
+  --muted: #5b625f;
+  --brand: #0f3d3e;
+  --accent: #e07a2f;
+  --ok: #2f7d4f;
+  --bad: #b3261e;
+  --card: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 18px; /* big type for older users */
+  line-height: 1.45;
+}
+
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+
+h1 { font-size: 2rem; margin: 0 0 8px; color: var(--brand); }
+p { margin: 0 0 16px; }
+.muted { color: var(--muted); }
+
+.btn {
+  display: inline-block;
+  padding: 14px 22px;
+  border-radius: 12px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn.secondary { background: #fff; color: var(--brand); border: 2px solid var(--brand); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+
+.stage { position: relative; width: 100%; background: #000; border-radius: 12px; overflow: hidden; }
+.stage video, .stage canvas { width: 100%; height: auto; display: block; }
+.stage canvas { position: absolute; inset: 0; height: 100%; }
+
+.hud { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 12px 0; }
+.stat { background: var(--card); border-radius: 10px; padding: 10px 12px; }
+.stat b { display: block; font-size: 1.4rem; }
+.ok { color: var(--ok); }
+.bad { color: var(--bad); }
+
+.disclaimer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid #ddd; padding-top: 12px; margin-top: 24px; }

@@ -1,0 +1,18 @@
+node_modules/
+.next/
+out/
+certificates/
+.env*.local
+.env
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.vercel
+
+# Validation data: never commit video or identifiable landmark streams
+recordings/
+*.mp4
+*.mov
+*.webm
+landmarks/
+public/mediapipe/
