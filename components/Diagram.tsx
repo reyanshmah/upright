@@ -31,7 +31,7 @@ export function SetupDiagram({ kind }: { kind: "tug" | "chair" | "measure" }) {
         strokeDasharray="3 4"
       />
       <text x={kind === "chair" ? 90 : 220} y="185" fontSize="12" fill="currentColor">
-        {kind === "chair" ? "phone, 2–3 m to the side" : "phone, 4–5 m to the side, hip height"}
+        {kind === "chair" ? "phone, 1–2 m to the side" : "phone, ~2 m (wide) or ~3 m to the side"}
       </text>
     </svg>
   );

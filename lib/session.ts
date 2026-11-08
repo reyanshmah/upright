@@ -11,7 +11,7 @@ export interface Profile {
   age: number;
   sex: Sex;
   walkingAid: WalkingAid;
-  /** Standing height, used only to scale the camera for the 3 m measurement. */
+  /** Standing height (cm). Kept for the clinician summary. */
   heightCm: number;
 }
 
@@ -37,6 +37,14 @@ export interface TugResult {
   lookedUnsteady: boolean;
   fpsMedian: number | null;
   gatesPassed: boolean;
+  camera?: CameraInfo;
+}
+
+/** Which camera recorded the test (for the quality line). */
+export interface CameraInfo {
+  label: string;
+  zoom: number | null;
+  wide: boolean;
 }
 
 export interface ChairResult {
@@ -46,13 +54,14 @@ export interface ChairResult {
   manualCount: number | null;
   fpsMedian: number | null;
   gatesPassed: boolean;
+  camera?: CameraInfo;
 }
 
 export interface SetupInfo {
   safetyConfirmed: boolean;
   /** How the 3 m line was laid out. */
-  lineMethod: "camera" | "tape" | null;
-  /** Distance the camera measured when the helper marked the line (meters). */
+  lineMethod: "ar" | "tape" | null;
+  /** Distance AR measured when the helper marked the line (meters). */
   cameraMeasuredM: number | null;
 }
 

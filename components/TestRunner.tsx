@@ -174,6 +174,9 @@ export function TestRunner({
     return total > 0 && ok / total >= 0.9;
   };
 
+  const camInfo = () =>
+    noCam || !cam.camera ? undefined : { label: cam.camera.label, zoom: cam.camera.zoom, wide: cam.camera.wide };
+
   const save = () => {
     if (kind === "tug") {
       const r: TugResult = {
@@ -184,6 +187,7 @@ export function TestRunner({
         lookedUnsteady: !!unsteady,
         fpsMedian: fpsMedian.current,
         gatesPassed: gatesPassed(),
+        camera: camInfo(),
       };
       setSaved(r);
       onSaved(r);
@@ -195,6 +199,7 @@ export function TestRunner({
         manualCount: auto ? null : Number(countText),
         fpsMedian: fpsMedian.current,
         gatesPassed: gatesPassed(),
+        camera: camInfo(),
       };
       setSaved(r);
       onSaved(r);
@@ -274,6 +279,12 @@ export function TestRunner({
 
       {phase === "position" && (
         <>
+          {cam.camera && (
+            <p className="camline">
+              {cam.camera.wide ? t.camWide : t.camNormal}{" "}
+              <button className="linkish" onClick={() => void cam.switchCamera()}>{t.camSwitch}</button>
+            </p>
+          )}
           <GateBadges gates={cam.gates} t={t} />
           {!gateReady && cam.status === "running" && <p className="muted">{t.gatesWaiting}</p>}
           <div className="row nav">

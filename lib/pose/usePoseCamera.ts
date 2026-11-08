@@ -9,6 +9,60 @@ import type { Landmark, PoseFrame } from "../signal/types";
 
 export type Facing = "environment" | "user";
 
+export interface ActiveCamera {
+  deviceId: string | null;
+  label: string;
+  /** Zoom applied (e.g. 0.5 for ultra-wide), if the browser exposes zoom. */
+  zoom: number | null;
+  /** true if we got a wider-than-normal view (zoom < 1 or an ultra-wide lens). */
+  wide: boolean;
+}
+
+const CAM_KEY = "upright.camera.v1";
+const WIDE_LABEL = /ultra|wide|0[.,]5/i;
+
+function rememberCamera(id: string | null) {
+  try {
+    if (id) sessionStorage.setItem(CAM_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+function rememberedCamera(): string | null {
+  try {
+    return sessionStorage.getItem(CAM_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function backCameras(): Promise<MediaDeviceInfo[]> {
+  const all = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+  const back = all.filter((d) => /back|rear|environment|trasera|posterior/i.test(d.label));
+  return back.length ? back : all;
+}
+
+/** Try to zoom out to the widest view the camera allows. */
+async function widen(track: MediaStreamTrack): Promise<number | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const caps = (track.getCapabilities?.() ?? {}) as any;
+  if (caps.zoom && typeof caps.zoom.min === "number") {
+    const min = caps.zoom.min as number;
+    if (min < 1) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await track.applyConstraints({ advanced: [{ zoom: min } as any] });
+        return min;
+      } catch {
+        /* fall through */
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ((track.getSettings() as any).zoom as number | undefined) ?? null;
+  }
+  return null;
+}
+
 export interface FrameInfo {
   /** performance.now() in ms */
   t: number;
@@ -49,6 +103,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const [status, setStatus] = useState<"idle" | "loading" | "running" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [gates, setGates] = useState<Gates>(NO_GATES);
+  const [camera, setCamera] = useState<ActiveCamera | null>(null);
 
   const stop = useCallback(() => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -127,23 +182,64 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     rafRef.current = requestAnimationFrame(loop);
   }, []);
 
+  const open = async (facing: Facing, deviceId: string | null) => {
+    const size = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    const video: MediaTrackConstraints = deviceId
+      ? { deviceId: { exact: deviceId }, ...size }
+      : { facingMode: facing, ...size };
+    return navigator.mediaDevices.getUserMedia({ video, audio: false });
+  };
+
   const start = useCallback(
-    async (facing: Facing = "environment", variant: ModelVariant = "full") => {
+    async (facing: Facing = "environment", variant: ModelVariant = "full", deviceId?: string | null) => {
       setError(null);
       try {
         if (!window.isSecureContext) throw new Error("The camera needs an https:// address.");
         setStatus("loading");
         if (!landmarkerRef.current) landmarkerRef.current = await createPoseLandmarker(variant);
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+
+        let id = deviceId ?? (facing === "environment" ? rememberedCamera() : null);
+        let stream: MediaStream;
+        try {
+          stream = await open(facing, id);
+        } catch {
+          id = null;
+          stream = await open(facing, null);
+        }
+        let track = stream.getVideoTracks()[0];
+        let zoom = await widen(track);
+
+        // No zoom-out available: look for a back camera labelled ultra-wide.
+        if (facing === "environment" && !deviceId && !(zoom !== null && zoom < 1) && !WIDE_LABEL.test(track.label)) {
+          const wideCam = (await backCameras()).find((d) => WIDE_LABEL.test(d.label));
+          if (wideCam && wideCam.deviceId !== track.getSettings().deviceId) {
+            try {
+              const s2 = await open(facing, wideCam.deviceId);
+              stream.getTracks().forEach((t) => t.stop());
+              stream = s2;
+              track = stream.getVideoTracks()[0];
+              zoom = await widen(track);
+            } catch {
+              /* keep the first camera */
+            }
+          }
+        }
+
+        const activeId = track.getSettings().deviceId ?? null;
+        if (facing === "environment") rememberCamera(activeId);
+        setCamera({
+          deviceId: activeId,
+          label: track.label,
+          zoom,
+          wide: (zoom !== null && zoom < 1) || WIDE_LABEL.test(track.label),
         });
         streamRef.current = stream;
         const video = videoRef.current!;
         video.srcObject = stream;
         await video.play();
         setStatus("running");
-        rafRef.current = requestAnimationFrame(loop);
+        if (rafRef.current === null) rafRef.current = requestAnimationFrame(loop);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setStatus("error");
@@ -152,6 +248,17 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     },
     [loop, stop],
   );
+
+  /** Cycle to the next back camera (for phones that list the wide lens separately). */
+  const switchCamera = useCallback(async () => {
+    const cams = await backCameras();
+    if (cams.length < 2) return false;
+    const cur = streamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
+    const i = cams.findIndex((c) => c.deviceId === cur);
+    const next = cams[(i + 1) % cams.length];
+    await start("environment", "full", next.deviceId);
+    return true;
+  }, [start]);
 
   const startRecording = useCallback(() => {
     recording.current = [];
@@ -171,5 +278,18 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     h: videoRef.current?.videoHeight ?? 0,
   });
 
-  return { videoRef, canvasRef, status, error, gates, start, stop, startRecording, stopRecording, videoSize };
+  return {
+    videoRef,
+    canvasRef,
+    status,
+    error,
+    gates,
+    camera,
+    start,
+    stop,
+    switchCamera,
+    startRecording,
+    stopRecording,
+    videoSize,
+  };
 }

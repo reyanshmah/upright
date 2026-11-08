@@ -213,7 +213,8 @@ export default function Results() {
               <td>
                 Camera gates (whole body, one person, ≥15 fps) passed during TUG: {tug ? (tug.gatesPassed ? "yes" : "no") : "—"}, chair stand: {chair ? (chair.gatesPassed ? "yes" : "no") : "—"} ·
                 Median fps: {tug?.fpsMedian ? tug.fpsMedian.toFixed(0) : "—"} / {chair?.fpsMedian ? chair.fpsMedian.toFixed(0) : "—"} ·
-                3 m line: {s.setup?.lineMethod === "camera" ? `camera-measured (${s.setup.cameraMeasuredM?.toFixed(2)} m, approx.)` : s.setup?.lineMethod === "tape" ? "tape measure" : "—"}
+                3 m line: {s.setup?.lineMethod === "ar" ? `phone AR (ARCore), ${s.setup.cameraMeasuredM?.toFixed(2)} m` : s.setup?.lineMethod === "tape" ? "tape measure" : "—"} ·
+                Camera: {[tug?.camera, chair?.camera].filter(Boolean).map((c) => `${c!.wide ? "wide " : ""}${c!.zoom ? `${c!.zoom}× ` : ""}${c!.label || "back camera"}`).filter((v, i, a) => a.indexOf(v) === i).join("; ") || "—"}
               </td>
             </tr>
           </tbody>

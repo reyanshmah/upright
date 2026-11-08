@@ -35,7 +35,7 @@ const en = {
   sexLabel: "Sex (used only for the CDC comparison table)",
   female: "Female",
   male: "Male",
-  heightLabel: "Height (used to measure the 3 m walking line with the camera)",
+  heightLabel: "Height",
   feet: "ft",
   inches: "in",
   cm: "cm",
@@ -84,7 +84,7 @@ const en = {
   // 3 m measure
   measureTitle: "Mark the 3 m walking line",
   measureSub: "The Timed Up and Go test needs a line on the floor 3 meters (about 10 feet) from the front of the chair.",
-  measureCamera: "Measure with the camera",
+  measureCamera: "Measure with the phone (AR, Android)",
   measureTape: "I have a tape measure",
   tapeTitle: "Measure 3 m with a tape",
   tapeBody: "Measure 3 meters (9 ft 10 in) straight out from the front edge of the chair seat and put a piece of tape across the floor there.",
@@ -135,11 +135,14 @@ const en = {
   skipped: "Skipped",
   downloadData: "Download landmark data (for validation)",
   noCamera: "Camera not working? Run with the helper's timing only",
+  camWide: "Using the wide (0.5×) camera",
+  camNormal: "Using the normal camera. If everything doesn't fit, try another camera.",
+  camSwitch: "Try another camera",
 
   // TUG
   tugName: "Timed Up and Go",
   tugWhat: "Measures walking, turning and standing up. Normal walking pace, not a race.",
-  tugPlace: "Phone on its side, about 4–5 m to the side of the path, at hip height. Chair and 3 m line both in view.",
+  tugPlace: "Phone on its side, to the side of the path, level with the middle of the 3 m line, at hip height. With the wide (0.5×) camera that is about 2 m away; with a normal camera about 3 m. Move it until the chair and the tape both show.",
   tugInstr: [
     "Sit back in the chair (armrests are OK for this test).",
     "When you hear “Go”: stand up, walk to the line at your normal pace, turn, walk back, and sit down again.",
@@ -167,7 +170,7 @@ const en = {
   // Chair stand
   chairName: "30-Second Chair Stand",
   chairWhat: "Measures leg strength and endurance.",
-  chairPlace: "Phone on its side, about 2–3 m to the side of the chair, at hip height.",
+  chairPlace: "Phone on its side, to the side of the chair, at hip height: about 1–1.5 m away with the wide (0.5×) camera, about 2 m with a normal camera.",
   chairInstr: [
     "Use a chair with a straight back and NO armrests, pushed against a wall.",
     "Sit in the middle of the chair, feet flat on the floor.",
@@ -218,7 +221,7 @@ const es: Strings = {
   sexLabel: "Sexo (solo para la tabla de comparación de los CDC)",
   female: "Mujer",
   male: "Hombre",
-  heightLabel: "Estatura (para medir con la cámara la línea de 3 m)",
+  heightLabel: "Estatura",
   feet: "pies",
   inches: "pulg",
   cm: "cm",
@@ -265,7 +268,7 @@ const es: Strings = {
 
   measureTitle: "Marque la línea de 3 m",
   measureSub: "La prueba Levántate y Anda necesita una línea en el piso a 3 metros (unos 10 pies) del frente de la silla.",
-  measureCamera: "Medir con la cámara",
+  measureCamera: "Medir con el teléfono (RA, Android)",
   measureTape: "Tengo una cinta métrica",
   tapeTitle: "Mida 3 m con una cinta",
   tapeBody: "Mida 3 metros (9 pies 10 pulgadas) en línea recta desde el borde delantero del asiento y ponga una cinta adhesiva en el piso.",
@@ -314,10 +317,13 @@ const es: Strings = {
   skipped: "Omitida",
   downloadData: "Descargar datos de puntos del cuerpo (para validación)",
   noCamera: "¿No funciona la cámara? Hacerla solo con el tiempo del ayudante",
+  camWide: "Usando la cámara gran angular (0.5×)",
+  camNormal: "Usando la cámara normal. Si no cabe todo, pruebe otra cámara.",
+  camSwitch: "Probar otra cámara",
 
   tugName: "Levántate y Anda (TUG)",
   tugWhat: "Mide caminar, girar y levantarse. A paso normal, no es una carrera.",
-  tugPlace: "Teléfono de lado, a unos 4–5 m al costado del camino, a la altura de la cadera. La silla y la línea de 3 m deben verse.",
+  tugPlace: "Teléfono de lado, al costado del camino, frente a la mitad de la línea de 3 m, a la altura de la cadera. Con la cámara gran angular (0.5×) son unos 2 m; con la cámara normal, unos 3 m. Muévalo hasta que se vean la silla y la cinta.",
   tugInstr: [
     "Siéntese bien atrás en la silla (en esta prueba se permiten brazos en la silla).",
     "Cuando oiga “Ya”: levántese, camine hasta la línea a su paso normal, dé la vuelta, regrese y siéntese otra vez.",
@@ -344,7 +350,7 @@ const es: Strings = {
 
   chairName: "Levantarse de la silla en 30 segundos",
   chairWhat: "Mide la fuerza y la resistencia de las piernas.",
-  chairPlace: "Teléfono de lado, a unos 2–3 m al costado de la silla, a la altura de la cadera.",
+  chairPlace: "Teléfono de lado, al costado de la silla, a la altura de la cadera: a unos 1–1.5 m con la cámara gran angular (0.5×), unos 2 m con la cámara normal.",
   chairInstr: [
     "Use una silla con respaldo recto y SIN brazos, contra la pared.",
     "Siéntese en el centro de la silla, con los pies planos en el piso.",
