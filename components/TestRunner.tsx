@@ -239,7 +239,19 @@ export function TestRunner({
   const elapsedRef = () => (goT.current === null ? 0 : (performance.now() - goT.current) / 1000);
 
   const abort = () => {
-    cam.stopRecording();
+    // Keep what was recorded so it can be downloaded and replayed.
+    const { frames } = cam.stopRecording();
+    const { w, h } = cam.videoSize();
+    if (frames.length) {
+      stream.current = {
+        version: 1,
+        sessionId: `s-${Date.now().toString(36)}-${kind}-stopped`,
+        goCueT: goT.current,
+        videoWidth: w,
+        videoHeight: h,
+        frames: frames as PoseFrame[],
+      };
+    }
     cam.stop();
     window.speechSynthesis?.cancel();
     setPhase("aborted");
@@ -376,6 +388,7 @@ export function TestRunner({
             <button className="btn secondary" onClick={() => onSkip("stopped for safety")}>{t.skipTest}</button>
             <button className="btn" onClick={redo}>{t.redo}</button>
           </div>
+          {stream.current && <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>}
         </>
       )}
 

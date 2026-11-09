@@ -21,12 +21,25 @@ export type Stage = 1 | 2 | 3 | 4;
 export const HOLD_S = 10;
 const STANCE_STABLE_MS = 800;
 const STANCE_GRACE_MS = 15_000;
-const MOVE_SCALE = 0.15; // foot moved > 0.15 shank lengths = moved (plan)
-const MOVE_MS = 150;
+/**
+ * A foot counts as moved only if its SMOOTHED position (median of the last
+ * 300 ms) is > 0.25 shank lengths (~10 cm) from where it was at the start of
+ * the hold (median of the first 400 ms), and stays that way for 300 ms.
+ * Single-frame jitter and brief tracking glitches don't end the hold.
+ */
+const MOVE_SCALE = 0.25;
+const MOVE_MS = 300;
+const REF_MS = 400;
+const WIN_MS = 300;
+const FOOT_VIS = 0.5;
+/** Moving within the first second of a hold = still settling in: restart the hold. */
+const SETTLE_MS = 1000;
 const LOST_MS = 1500;
 
 export interface FrontFeat {
   t: number;
+  laVis: number;
+  raVis: number;
   la: { x: number; y: number }; // left ankle px (smoothed)
   ra: { x: number; y: number };
   hipMidX: number;
@@ -36,6 +49,14 @@ export interface FrontFeat {
   lift: number;
   /** which ankle is higher (lifted) */
   lifted: "left" | "right";
+  /**
+   * Feet by POSITION, not by MediaPipe's left/right label (which can swap):
+   * a = left-most in the image, b = right-most; planted = lower foot, up = higher foot.
+   */
+  a: { x: number; y: number; vis: number };
+  b: { x: number; y: number; vis: number };
+  planted: { x: number; y: number; vis: number };
+  up: { x: number; y: number; vis: number };
 }
 
 function usable(p: Landmark | undefined) {
@@ -77,8 +98,18 @@ export class FrontFeatures {
     const la = { x: this.f.lax.filter(la0.x, s), y: this.f.lay.filter(la0.y, s) };
     const ra = { x: this.f.rax.filter(ra0.x, s), y: this.f.ray.filter(ra0.y, s) };
     const hipMidX = this.f.hx.filter((lh.x + rh.x) / 2, s);
+    const L = { ...la, vis: lms[LM.leftAnkle].visibility ?? 0 };
+    const R = { ...ra, vis: lms[LM.rightAnkle].visibility ?? 0 };
+    const [a, b] = L.x <= R.x ? [L, R] : [R, L];
+    const [planted, up] = L.y >= R.y ? [L, R] : [R, L];
     return {
       t,
+      a,
+      b,
+      planted,
+      up,
+      laVis: L.vis,
+      raVis: R.vis,
       la,
       ra,
       hipMidX,
@@ -93,7 +124,7 @@ export class FrontFeatures {
 
 /** Does this frame look like the stance for this stage? (approximate) */
 export function stanceMatches(stage: Stage, f: FrontFeat): boolean {
-  const oneFoot = f.lift > 0.25;
+  const oneFoot = f.lift > 0.18;
   if (stage === 4) return oneFoot;
   if (oneFoot) return false;
   if (stage === 1) return f.lateral >= 0.2;
@@ -119,7 +150,9 @@ export class BalanceDetector {
   private stableSince: number | null = null;
   private holdStartT = 0;
   private stanceVerified = false;
-  private ref: { la: { x: number; y: number }; ra: { x: number; y: number }; lifted: "left" | "right" } | null = null;
+  private ref: ReturnType<typeof medianFeet> | null = null;
+  private refFrames: FrontFeat[] = [];
+  private recent: FrontFeat[] = [];
   private movedSince: number | null = null;
   private swayXs: number[] = [];
   private lastFeatT = 0;
@@ -134,6 +167,8 @@ export class BalanceDetector {
     this.stageStartT = t;
     this.stableSince = null;
     this.ref = null;
+    this.refFrames = [];
+    this.recent = [];
     this.movedSince = null;
     this.swayXs = [];
     this.heldS = 0;
@@ -163,7 +198,8 @@ export class BalanceDetector {
         this.stanceVerified = stable;
         this.status = "holding";
         this.holdStartT = t;
-        this.ref = { la: { ...f.la }, ra: { ...f.ra }, lifted: f.lifted };
+        this.ref = null;
+        this.refFrames = [];
         this.events.push({ t, type: "holdStart", stage: this.stage });
       }
       return this.status;
@@ -172,20 +208,47 @@ export class BalanceDetector {
     // Holding: feet must not move.
     this.heldS = (t - this.holdStartT) / 1000;
     this.swayXs.push(f.hipMidX / f.hipW);
-    const r = this.ref!;
-    const dl = Math.hypot(f.la.x - r.la.x, f.la.y - r.la.y) / f.shank;
-    const dr = Math.hypot(f.ra.x - r.ra.x, f.ra.y - r.ra.y) / f.shank;
+    this.recent.push(f);
+    while (this.recent.length && t - this.recent[0].t > WIN_MS) this.recent.shift();
+
+    // Reference = median foot positions over the first 400 ms of the hold.
+    if (!this.ref) {
+      this.refFrames.push(f);
+      if (t - this.holdStartT >= REF_MS) {
+        this.ref = medianFeet(this.refFrames);
+      }
+      if (this.heldS >= HOLD_S) this.end(this.holdStartT + HOLD_S * 1000, true);
+      return this.status;
+    }
+
+    const r = this.ref;
+    const now = medianFeet(this.recent);
+    const dist = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y) / f.shank;
     let moved: boolean;
     if (this.stage === 4) {
-      // Standing foot must stay put; the lifted foot must stay up.
-      const standing = r.lifted === "left" ? dr : dl;
-      moved = standing > MOVE_SCALE || f.lift < 0.12;
+      // Planted foot must stay put; the raised foot must not come back down.
+      const plantedMoved = f.planted.vis >= FOOT_VIS && dist(now.planted, r.planted) > MOVE_SCALE;
+      const down = f.a.vis >= FOOT_VIS && f.b.vis >= FOOT_VIS && now.lift < 0.07;
+      moved = plantedMoved || down;
     } else {
-      moved = dl > MOVE_SCALE || dr > MOVE_SCALE;
+      const ma = f.a.vis >= FOOT_VIS ? dist(now.a, r.a) : 0;
+      const mb = f.b.vis >= FOOT_VIS ? dist(now.b, r.b) : 0;
+      moved = ma > MOVE_SCALE || mb > MOVE_SCALE;
     }
     if (moved) {
       this.movedSince ??= t;
       if (t - this.movedSince >= MOVE_MS) {
+        if (this.movedSince - this.holdStartT < SETTLE_MS) {
+          // Still settling into the position: restart the hold, don't fail.
+          this.holdStartT = t;
+          this.heldS = 0;
+          this.ref = null;
+          this.refFrames = [];
+          this.swayXs = [];
+          this.movedSince = null;
+          this.events.push({ t, type: "holdStart", stage: this.stage });
+          return this.status;
+        }
         this.end(this.movedSince, false);
         return this.status;
       }
@@ -208,6 +271,21 @@ export class BalanceDetector {
     this.status = completed ? "held" : "failed";
     this.events.push({ t: tEnd, type: "stageEnd", stage: this.stage });
   }
+}
+
+function medianFeet(fs: FrontFeat[]) {
+  const med = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  const pt = (pick: (f: FrontFeat) => { x: number; y: number }) => ({
+    x: med(fs.map((f) => pick(f).x)),
+    y: med(fs.map((f) => pick(f).y)),
+  });
+  const planted = pt((f) => f.planted);
+  const up = pt((f) => f.up);
+  const shank = med(fs.map((f) => f.shank));
+  return { a: pt((f) => f.a), b: pt((f) => f.b), planted, up, lift: Math.abs(planted.y - up.y) / shank };
 }
 
 /** CDC: cannot hold tandem (stage 3) for 10 s = increased fall risk. */

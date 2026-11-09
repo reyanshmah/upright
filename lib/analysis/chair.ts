@@ -50,9 +50,10 @@ export class ChairDetector {
     if (!f) return this.snapshot(t);
 
     this.lastFeat = f;
-    const { state, changed } = this.posture.update(f);
-    if (state === "SEATED") this.seatedH.push(f.hipH);
-    if (state === "STANDING") this.standingH.push(f.hipH);
+    const { state, changed, raw } = this.posture.update(f);
+    // Reference heights from clearly-seated / clearly-standing frames only.
+    if (raw === "SEATED") this.seatedH.push(f.hipH);
+    if (raw === "STANDING") this.standingH.push(f.hipH);
     if (changed && state === "STANDING" && this.posture.since >= this.goT) this.count++;
 
     // Arm use: a wrist low on the body while rising (not yet standing).

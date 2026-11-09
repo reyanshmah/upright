@@ -91,3 +91,64 @@ describe("balance holds", () => {
     expect(tandemHeld10(det.results)).toBe(true);
   });
 });
+
+describe("balance holds don't end from camera jitter (real-phone bug)", () => {
+  // Deterministic pseudo-random jitter
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+
+  const jittery = (base: Landmark[], t: number) =>
+    base.map((p, i) => {
+      if (i !== 27 && i !== 28) return p;
+      const glitch = Math.floor(t * 30) % 47 === 0; // occasional one-frame glitch
+      const j = glitch ? 0.045 : 0.008; // 45 px spike vs normal ~8 px jitter (shank = 100 px)
+      return { ...p, x: p.x + rnd() * j, y: p.y + rnd() * j, visibility: glitch ? 0.35 : p.visibility };
+    });
+
+  it("tandem: holds the full 10 s with jitter and glitches", () => {
+    const det = run(3, (t) => jittery(STANCE[3](), t), 14);
+    expect(det.results[0].completed).toBe(true);
+    expect(det.results[0].heldS).toBe(10);
+  });
+
+  it("one foot: holds the full 10 s when the lifted foot dips but doesn't touch down", () => {
+    // lift starts at 45 px (0.45 shank), sways down to ~22 px and back
+    const dip = (t: number) => jittery(front(510, 490, 34 + 11 * Math.cos(t * 2)), t);
+    const det = run(4, dip, 14);
+    expect(det.results[0].completed).toBe(true);
+  });
+
+  it("still catches a real step out of tandem", () => {
+    const det = run(3, (t) => jittery(t < 6.8 ? STANCE[3]() : front(503, 440), t), 14);
+    expect(det.results[0].completed).toBe(false);
+    expect(det.results[0].heldS).toBeGreaterThan(5.6);
+    expect(det.results[0].heldS).toBeLessThan(6.6);
+  });
+});
+
+describe("balance: camera swaps left/right foot labels (real-phone bug)", () => {
+  // MediaPipe sometimes swaps which ankle is 'left' vs 'right' for a while.
+  const swapAt = (lms: Landmark[], swapped: boolean) => {
+    if (!swapped) return lms;
+    const c = lms.map((p) => ({ ...p }));
+    for (const [a, b] of [[25, 26], [27, 28]]) [c[a], c[b]] = [c[b], c[a]];
+    return c;
+  };
+  const swaps = (t: number) => (t > 3 && t < 3.5) || (t > 6 && t < 7.2) || (t > 9 && t < 9.4);
+
+  it("feet side by side: label swaps don't count as moving", () => {
+    const det = run(1, (t) => swapAt(STANCE[1](), swaps(t)), 14);
+    expect(det.results[0].completed).toBe(true);
+  });
+
+  it("one foot: label swaps don't count as the foot touching down", () => {
+    const det = run(4, (t) => swapAt(STANCE[4](), swaps(t)), 14);
+    expect(det.results[0].completed).toBe(true);
+  });
+
+  it("settling in the first second restarts the hold instead of failing", () => {
+    // shuffles the back foot 15 px at 1.2 s (just after the hold starts), then stays still
+    const det = run(3, (t) => (t < 1.2 ? front(503, 497) : front(503, 470)), 16);
+    expect(det.results[0].completed).toBe(true);
+  });
+});

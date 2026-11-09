@@ -35,9 +35,10 @@ const LOST_MS = 5_000;
 
 export class TugDetector {
   private posture = new PostureTracker(150);
-  private seatedFinal = new PostureTracker(300);
   private chairX: number | null = null;
   private preSeatedX: number[] = [];
+  private sitRunSince: number | null = null;
+  private lastSitT = 0;
   private goT: number | null = null;
   private stood = false;
   private maxD = 0;
@@ -55,6 +56,7 @@ export class TugDetector {
     if (this.preSeatedX.length) {
       const s = [...this.preSeatedX].sort((a, b) => a - b);
       this.chairX = s[Math.floor(s.length / 2)];
+
     }
     this.phase = "standUp";
   }
@@ -93,6 +95,13 @@ export class TugDetector {
       this.stood = true;
       this.standT = this.posture.since;
     }
+    // Backup: if they've clearly walked away from the chair, they stood up.
+    // Stand time = first frame after Go with the hip clearly raised.
+    if (!this.stood && d > 1.5 && raw !== "SEATED") {
+      this.stood = true;
+      const up = this.feats.find((x) => x.d !== null && x.f.t >= this.goT! && x.f.hipH > 1.5);
+      this.standT = up ? up.f.t : f.t;
+    }
     this.maxD = Math.max(this.maxD, d);
     if (!this.turned && this.maxD >= MIN_TURN_D && d < this.maxD - 1.0) this.turned = true;
 
@@ -103,12 +112,23 @@ export class TugDetector {
       this.phase = this.maxD >= LEFT_CHAIR && d > 0.7 * this.maxD && Math.abs(v) < 0.8 ? "turn" : "walkOut";
     } else this.phase = d < BACK_NEAR ? "sitDown" : "walkBack";
 
-    // End: back at the chair and seated (held 300 ms).
-    const sf = this.seatedFinal.update(f);
-    if (this.turned && sf.state === "SEATED" && d < BACK_NEAR + 0.5) {
-      this.endT = this.seatedFinal.since;
-      this.phase = "done";
-      return this.snapshot();
+    // End: a NEW sit-down (after standing and turning), back at the chair,
+    // held 300 ms. End time = the start of that seated run.
+    if (this.stood && this.turned && this.standT !== null) {
+      if (raw === "SEATED") {
+        if (this.sitRunSince === null || f.t - this.lastSitT > 500) this.sitRunSince = f.t;
+        this.lastSitT = f.t;
+      } else if (raw === "STANDING") this.sitRunSince = null;
+      if (
+        this.sitRunSince !== null &&
+        this.sitRunSince > this.standT &&
+        f.t - this.sitRunSince >= 300 &&
+        d < BACK_NEAR + 0.5
+      ) {
+        this.endT = this.sitRunSince;
+        this.phase = "done";
+        return this.snapshot();
+      }
     }
     if (t - this.goT > TIMEOUT_MS) return this.fail("timeout");
     return this.snapshot();

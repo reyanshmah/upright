@@ -16,8 +16,10 @@ import { LM, type Landmark } from "../signal/types";
 export interface Feat {
   t: number; // ms (performance.now)
   hipX: number; // px, smoothed
-  hipH: number; // hip height above ankle, in shank lengths
-  kneeDeg: number; // smoothed knee angle (near leg)
+  /** Hip height above the PLANTED (lower) foot, in shank lengths. */
+  hipH: number;
+  /** Straightest visible knee (the planted leg while walking), smoothed. */
+  kneeDeg: number;
   shank: number; // px, rolling median
   /** true = a wrist is low (hands near thighs/chair), false = wrists high on chest, null = no wrist visible */
   wristLow: boolean | null;
@@ -25,10 +27,14 @@ export interface Feat {
 
 export type Posture = "SEATED" | "STANDING" | "BETWEEN";
 
-/** Raw per-frame posture class. Both knee angle and hip height must agree. */
+/**
+ * Raw per-frame posture class.
+ * Standing uses the straighter knee and hip height above the planted foot, so a
+ * walking step (the swing knee bends) still reads as standing.
+ */
 export function classify(f: Feat): Posture {
   if (f.kneeDeg < 125 && f.hipH < 1.45) return "SEATED";
-  if (f.kneeDeg > 145 && f.hipH > 1.6) return "STANDING";
+  if (f.kneeDeg > 140 && f.hipH > 1.55) return "STANDING";
   return "BETWEEN";
 }
 
@@ -43,8 +49,12 @@ function median(xs: number[]) {
   return s[Math.floor(s.length / 2)];
 }
 
+const LEGS = [
+  { hip: LM.leftHip, knee: LM.leftKnee, ankle: LM.leftAnkle },
+  { hip: LM.rightHip, knee: LM.rightKnee, ankle: LM.rightAnkle },
+];
+
 export class FeatureExtractor {
-  private side: "left" | "right" | null = null;
   private shanks: number[] = [];
   private fx = new OneEuroFilter({ minCutoff: 1.5, beta: 0.01, dCutoff: 1 });
   private fhip = new OneEuroFilter({ minCutoff: 1.5, beta: 0.01, dCutoff: 1 });
@@ -54,42 +64,33 @@ export class FeatureExtractor {
 
   push(t: number, lms: Landmark[] | null): Feat | null {
     if (!lms) return null;
-    const vis = (s: "left" | "right") => {
-      const i = s === "left" ? [LM.leftHip, LM.leftKnee, LM.leftAnkle] : [LM.rightHip, LM.rightKnee, LM.rightAnkle];
-      return i.reduce((a, k) => a + (lms[k]?.visibility ?? 0), 0);
-    };
-    // Near leg = more visible. Only switch sides on a clear difference.
-    const l = vis("left"), r = vis("right");
-    if (!this.side) this.side = l >= r ? "left" : "right";
-    else if (this.side === "left" && r > l + 0.4) this.side = "right";
-    else if (this.side === "right" && l > r + 0.4) this.side = "left";
-
-    const s = this.side;
-    const hip = lms[s === "left" ? LM.leftHip : LM.rightHip];
-    const knee = lms[s === "left" ? LM.leftKnee : LM.rightKnee];
-    const ankle = lms[s === "left" ? LM.leftAnkle : LM.rightAnkle];
-    if (!usable(hip) || !usable(knee) || !usable(ankle)) return null;
-
     const W = this.w, H = this.h;
-    const shankNow = Math.hypot((knee.x - ankle.x) * W, (knee.y - ankle.y) * H);
-    if (shankNow < 5) return null;
-    this.shanks.push(shankNow);
-    if (this.shanks.length > 90) this.shanks.shift();
+    const legs = LEGS.filter((l) => usable(lms[l.hip]) && usable(lms[l.knee]) && usable(lms[l.ankle]));
+    if (!legs.length) return null;
+
+    for (const l of legs) {
+      const k = lms[l.knee], a = lms[l.ankle];
+      const len = Math.hypot((k.x - a.x) * W, (k.y - a.y) * H);
+      if (len > 5) this.shanks.push(len);
+    }
+    while (this.shanks.length > 120) this.shanks.shift();
+    if (!this.shanks.length) return null;
     const shank = median(this.shanks);
 
-    // Hip x: average both hips (they overlap in a side view) for stability.
     const lh = lms[LM.leftHip], rh = lms[LM.rightHip];
-    const hipXraw = ((lh.x + rh.x) / 2) * W;
+    const hipY = ((lh.y + rh.y) / 2) * H;
+    // Planted foot = the lower ankle in the image.
+    const ankleY = Math.max(...legs.map((l) => lms[l.ankle].y * H));
+    const kneeRaw = Math.max(...legs.map((l) => angleDeg(lms[l.hip], lms[l.knee], lms[l.ankle], W, H)).filter((x) => !Number.isNaN(x)));
+    if (!Number.isFinite(kneeRaw)) return null;
+
     const ts = t / 1000;
-    const hipX = this.fx.filter(hipXraw, ts);
-    const hipHraw = ((ankle.y - hip.y) * H) / shank;
-    const hipH = this.fhip.filter(hipHraw, ts);
-    const kneeRaw = angleDeg(hip, knee, ankle, W, H);
-    const kneeDeg = Number.isNaN(kneeRaw) ? NaN : this.fknee.filter(kneeRaw, ts);
+    const hipX = this.fx.filter(((lh.x + rh.x) / 2) * W, ts);
+    const hipH = this.fhip.filter((ankleY - hipY) / shank, ts);
+    const kneeDeg = this.fknee.filter(kneeRaw, ts);
 
     // Wrists: crossed on the chest = high on the torso; pushing off = low.
     const shY = ((lms[LM.leftShoulder].y + lms[LM.rightShoulder].y) / 2) * H;
-    const hipY = ((lh.y + rh.y) / 2) * H;
     const torso = hipY - shY;
     let wristLow: boolean | null = null;
     for (const wi of [LM.leftWrist, LM.rightWrist]) {
@@ -105,27 +106,58 @@ export class FeatureExtractor {
 
 /**
  * Posture with time hysteresis. A new posture must hold `holdMs` before it is
- * accepted; `since` is when that run STARTED, so event times aren't delayed by
- * the hold. BETWEEN frames never change the state.
+ * accepted; `since` is when that run STARTED. In-between frames (e.g. a knee
+ * bending mid-step) don't break a run; only the OPPOSITE posture, or more than
+ * `gapMs` of in-between frames, does.
  */
 export class PostureTracker {
   state: Posture = "BETWEEN";
   since = 0;
   private cand: Posture = "BETWEEN";
   private candSince = 0;
+  private lastCandT = 0;
+  /** The person's own seated hip height (learned from clearly-seated frames). */
+  private seatedH: number[] = [];
 
-  constructor(private holdMs = 150) {}
+  constructor(private holdMs = 150, private gapMs = 500) {}
+
+  get seatedBase(): number | null {
+    if (this.seatedH.length < 5) return null;
+    const s = [...this.seatedH].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  }
+
+  /**
+   * Fixed thresholds, plus a person-relative rule: hip clearly above their own
+   * seated height with the knee mostly straight = standing. This covers camera
+   * angles where a standing hip never reaches the fixed cutoff.
+   */
+  classify(f: Feat): Posture {
+    const raw = classify(f);
+    if (raw === "SEATED") {
+      this.seatedH.push(f.hipH);
+      if (this.seatedH.length > 60) this.seatedH.shift();
+      return raw;
+    }
+    const base = this.seatedBase;
+    if (raw === "BETWEEN" && base !== null) {
+      if (f.hipH > base + 0.45 && f.kneeDeg > 135) return "STANDING";
+      if (f.hipH < base + 0.15 && f.kneeDeg < 130) return "SEATED";
+    }
+    return raw;
+  }
 
   update(f: Feat): { state: Posture; changed: boolean; raw: Posture } {
-    const raw = classify(f);
+    const raw = this.classify(f);
     if (raw === "BETWEEN") {
-      this.cand = "BETWEEN";
+      if (this.cand !== "BETWEEN" && f.t - this.lastCandT > this.gapMs) this.cand = "BETWEEN";
       return { state: this.state, changed: false, raw };
     }
     if (raw !== this.cand) {
       this.cand = raw;
       this.candSince = f.t;
     }
+    this.lastCandT = f.t;
     if (raw !== this.state && f.t - this.candSince >= this.holdMs) {
       this.state = raw;
       this.since = this.candSince;
