@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "lang": "es",
+  "ageBand": "60-64",
+  "sex": "female",
+  "screening": {
+    "unsteady": false,
+    "worry": false,
+    "fallen": false,
+    "fallCount": null,
+    "injured": null
+  },
+  "tug": {
+    "schemaVersion": 1,
+    "outcome": "full",
+    "totalSec": 9.0,
+    "riskFlag": false,
+    "timingErrorSec": 0.033,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ],
+    "phases": {
+      "standUp": 1.1,
+      "walkOut": 2.7,
+      "turn": 1.1,
+      "walkBack": 3.0,
+      "sitDown": 1.1
+    }
+  },
+  "chair": {
+    "schemaVersion": 1,
+    "outcome": "refused",
+    "refusalReason": "not_visible_at_start_or_end",
+    "stands": null,
+    "armUse": false,
+    "belowNorm": null,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  }
+}

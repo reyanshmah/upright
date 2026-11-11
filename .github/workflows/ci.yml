@@ -1,0 +1,20 @@
+name: CI
+
+# Typecheck and unit/synthetic/golden tests on every push. There is no lint script,
+# so lint is not part of CI (MASTER.md: run typecheck and tests on every push).
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

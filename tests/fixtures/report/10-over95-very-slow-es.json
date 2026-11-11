@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "lang": "es",
+  "ageBand": "95+",
+  "sex": "female",
+  "screening": {
+    "unsteady": false,
+    "worry": false,
+    "fallen": false,
+    "fallCount": null,
+    "injured": null
+  },
+  "tug": {
+    "schemaVersion": 1,
+    "outcome": "total_only",
+    "totalSec": 18.6,
+    "riskFlag": true,
+    "timingErrorSec": 0.033,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  },
+  "chair": {
+    "skipped": true
+  }
+}

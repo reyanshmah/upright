@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { createPoseLandmarker, SKELETON_EDGES, type ModelVariant } from "@/lib/pose/landmarker";
-import { OneEuroFilter } from "@/lib/signal/oneEuro";
-import { cameraSide, kneeAngle, wholeBodyVisible } from "@/lib/signal/geometry";
-import { StandStateMachine, type PoseState } from "@/lib/signal/chairStand";
+import { wholeBodyVisible } from "@/lib/signal/geometry";
+import { toRecorded } from "@/lib/signal/privacy";
+import { FeatureExtractor, classify } from "@/lib/analysis/features";
+import { ChairDetector } from "@/lib/analysis/chair";
 import { ALGO } from "@/lib/signal/thresholds";
 import type { Landmark, LandmarkStream, PoseFrame } from "@/lib/signal/types";
 
@@ -16,7 +17,7 @@ interface Hud {
   people: number;
   bodyVisible: boolean;
   knee: number | null;
-  state: PoseState;
+  state: "SEATED" | "STANDING" | "BETWEEN";
   stands: number;
 }
 
@@ -30,9 +31,9 @@ export default function PosePage() {
   const rafRef = useRef<number | null>(null);
   const lastVideoTime = useRef(-1);
   const frameTimes = useRef<number[]>([]);
-  const kneeFilter = useRef(new OneEuroFilter());
-  const sm = useRef(new StandStateMachine());
-  const stands = useRef(0);
+  // Same detectors as the real chair-stand test (lib/analysis/chair.ts).
+  const fx = useRef<FeatureExtractor | null>(null);
+  const chair = useRef<ChairDetector | null>(null);
   const recording = useRef<PoseFrame[] | null>(null);
 
   const [status, setStatus] = useState("Tap Start camera. Allow camera access when asked.");
@@ -106,20 +107,19 @@ export default function PosePage() {
       let knee: number | null = null;
       let bodyVisible = false;
       const main = people[0];
-      if (main) {
-        bodyVisible = wholeBodyVisible(main, ALGO.minVisibility);
-        const raw = kneeAngle(main, cameraSide(main), w, h);
-        if (!Number.isNaN(raw)) {
-          knee = kneeFilter.current.filter(raw, t / 1000);
-          if (sm.current.update(knee).stood) stands.current++;
-        }
+      if (!fx.current || !chair.current) {
+        fx.current = new FeatureExtractor(w, h);
+        chair.current = new ChairDetector();
+        chair.current.setGo(t); // dev page: the 30 s window starts when counting (re)starts
       }
+      const feat = fx.current.push(t, main ?? null);
+      const live = chair.current.push(feat, t);
+      if (main) bodyVisible = wholeBodyVisible(main, ALGO.minVisibility);
+      if (feat && !Number.isNaN(feat.kneeDeg)) knee = feat.kneeDeg;
 
       recording.current?.push({
         t,
-        landmarks: main
-          ? main.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 0 }))
-          : null,
+        landmarks: toRecorded(main ?? null),
       });
 
       draw(people, w, h);
@@ -128,8 +128,8 @@ export default function PosePage() {
         people: people.length,
         bodyVisible,
         knee,
-        state: sm.current.state,
-        stands: stands.current,
+        state: feat ? classify(feat) : "BETWEEN",
+        stands: live.count,
       });
     }
     rafRef.current = requestAnimationFrame(loop);
@@ -162,9 +162,8 @@ export default function PosePage() {
   };
 
   const resetCount = () => {
-    sm.current = new StandStateMachine();
-    kneeFilter.current.reset();
-    stands.current = 0;
+    fx.current = null; // rebuilt on the next frame, restarts the 30 s window
+    chair.current = null;
   };
 
   const toggleRecording = () => {
@@ -196,25 +195,25 @@ export default function PosePage() {
   const fpsOk = hud.fps >= ALGO.minFps;
 
   return (
-    <main>
+    <main className="dev">
       <h1>Camera check</h1>
       <p className="muted">{status}</p>
 
       <div className="row">
         {!running ? (
-          <button className="btn" onClick={start}>Start camera</button>
+          <button className="btn btn--primary" onClick={start}>Start camera</button>
         ) : (
-          <button className="btn secondary" onClick={stop}>Stop</button>
+          <button className="btn btn--secondary" onClick={stop}>Stop</button>
         )}
         <button
-          className="btn secondary"
+          className="btn btn--secondary"
           disabled={running}
           onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
         >
           {facing === "environment" ? "Back camera" : "Front camera"}
         </button>
         <button
-          className="btn secondary"
+          className="btn btn--secondary"
           disabled={running || landmarkerRef.current !== null}
           onClick={() => setVariant((v) => (v === "full" ? "lite" : "full"))}
         >
@@ -237,8 +236,8 @@ export default function PosePage() {
       </div>
 
       <div className="row">
-        <button className="btn secondary" disabled={!running} onClick={resetCount}>Reset count</button>
-        <button className="btn secondary" disabled={!running} onClick={toggleRecording}>
+        <button className="btn btn--secondary" disabled={!running} onClick={resetCount}>Reset count</button>
+        <button className="btn btn--secondary" disabled={!running} onClick={toggleRecording}>
           {isRecording ? "Stop & download landmarks" : "Record landmark stream"}
         </button>
       </div>

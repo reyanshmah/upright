@@ -66,20 +66,138 @@ export function scoreChairStand(count: number, armsUsed: boolean, age: number, s
   return { score, norm, belowAverage: norm === null ? null : score < norm };
 }
 
-/** Algorithm constants (from the execution plan; tune on saved streams). */
+/**
+ * ALL tunable numbers live in this file (MASTER.md rule: never inline a number
+ * in a detector). Bump CONFIG_VERSION on every change; thresholds freeze on
+ * Nov 14 (v1.0), after that only bug fixes.
+ */
+export const CONFIG_VERSION = "2026-11-11.1";
+
+/** Algorithm constants shared by the live gates and the tests. */
 export const ALGO = {
-  /** Knee angle below this = SEATED (degrees). */
-  seatedKneeDeg: 110,
-  /** Knee angle above this = STANDING (degrees). */
-  standingKneeDeg: 160,
-  /** A new state must hold this many consecutive frames (hysteresis). */
-  holdFrames: 3,
   /** Chair-stand test window (seconds). */
   chairStandWindowS: 30,
-  /** Arm-use flag: wrist farther than this many body scales from opposite shoulder. */
-  armUseBodyScales: 0.6,
   /** Minimum live frame rate for a test to be scored. */
   minFps: 15,
   /** Minimum landmark visibility for the whole-body gate. */
   minVisibility: 0.4,
+} as const;
+
+/** Live gate hysteresis: a gate turns ON after onMs of good frames, OFF after offMs of bad ones. */
+export const GATES = {
+  body: { onMs: 300, offMs: 600 },
+  onePerson: { onMs: 300, offMs: 600 },
+  fps: { onMs: 500, offMs: 1000 },
+  seated: { onMs: 400, offMs: 600 },
+  arms: { onMs: 400, offMs: 600 },
+  /** Start stays disabled until every gate has been green this long. */
+  allGreenHoldMs: 700,
+  /** A second person in view longer than this (ms, inside the run) refuses the test. */
+  secondPersonRefuseMs: 500,
+  /** Whole-body gate off this long at the start or end of a TUG = person not visible there. */
+  tugEdgeWindowMs: 500,
+  /** Chair stand: refuse if the body gate was off for more than this fraction of the 30 s window. */
+  chairMaxBodyOffFrac: 0.1,
+} as const;
+
+/** Per-frame features (lib/analysis/features.ts). */
+export const FEATURES = {
+  /** Landmark counts as usable above this visibility and inside the image. */
+  minVisibility: 0.3,
+  frameMargin: 0.02,
+  minShankPx: 5,
+  /** Rolling window for the median shank length (samples; both legs add one per frame). */
+  shankWindow: 120,
+  hipXFilter: { minCutoff: 1.5, beta: 0.01, dCutoff: 1 },
+  hipHFilter: { minCutoff: 1.5, beta: 0.01, dCutoff: 1 },
+  kneeFilter: { minCutoff: 1.5, beta: 0.02, dCutoff: 1 },
+  wristMinVisibility: 0.4,
+  /** Wrist is "low" when below shoulder + this fraction of the torso length. */
+  wristLowTorsoFrac: 0.65,
+} as const;
+
+/** Raw per-frame posture class: knee angle (deg) AND hip height (shank lengths) must agree. */
+export const POSTURE = {
+  seatedKneeDeg: 125,
+  seatedHipH: 1.45,
+  standingKneeDeg: 140,
+  standingHipH: 1.55,
+  /** Default time a posture must hold before it is accepted (ms). */
+  holdMs: 150,
+  /** In-between frames for longer than this (ms) break a posture run. */
+  gapMs: 500,
+  /** The person's own seated hip height: median of up to this many seated frames, needs at least the min. */
+  seatedBaseWindow: 60,
+  seatedBaseMinFrames: 5,
+  /** Person-relative rule for in-between frames: hip this far above their seated height AND knee this straight = standing. */
+  relStandingRiseH: 0.45,
+  relStandingKneeDeg: 135,
+  /** ...hip within this of their seated height AND knee this bent = seated. */
+  relSeatedRiseH: 0.15,
+  relSeatedKneeDeg: 130,
+} as const;
+
+/** Timed Up and Go detector (lib/analysis/tug.ts). Distances are in shank lengths. */
+export const TUG = {
+  /** Walked away from the chair (~1.1 m). */
+  leftChair: 2.5,
+  /** Must get this far before a turn counts. */
+  minTurnD: 3.5,
+  /** Within this of the chair = back at the chair. */
+  backNear: 2.5,
+  /** Hard limit: the test stops and is refused (MASTER.md: 60 s). */
+  timeoutMs: 60_000,
+  /** No usable pose for this long = person lost. */
+  lostMs: 5_000,
+  /** Raw posture hold for the main tracker, and for the final seated check. */
+  postureHoldMs: 150,
+  seatedFinalHoldMs: 300,
+  /** Seated frames kept to learn where the chair is before Go. */
+  preSeatedFrames: 45,
+  /** Turn = distance fell this far below the farthest point. */
+  turnDropD: 1.0,
+  /** Live "turn" label: at least this fraction of max distance and slower than turnSpeed. */
+  turnNearMaxFrac: 0.7,
+  turnSpeed: 0.8,
+  /** Window for displacement speed (ms). */
+  speedWindowMs: 400,
+  /** End check tolerates this much extra distance from the chair. */
+  endExtraD: 0.5,
+  /** A seated run survives non-seated frames for up to this long (ms). */
+  sitRunGapMs: 500,
+  /** Backup stand detection: this far from the chair and not seated = they stood; stand time = first frame with hip above backupStandHipH. */
+  backupStandD: 1.5,
+  backupStandHipH: 1.5,
+  /** Phase split: smoothing half-window (ms), percentile of speed, turn edge fraction, min frames. */
+  phaseSmoothMs: 250,
+  phaseSpeedPercentile: 0.8,
+  phaseEdgeFrac: 0.3,
+  phaseMinFrames: 10,
+  /** TUG >= this many seconds: the app suggests skipping the chair stand for safety. */
+  verySlowS: 20,
+} as const;
+
+/**
+ * 3 m visibility check during the TUG (lib/analysis/mark.ts). NEW on Nov 11;
+ * no existing value changed. Failing it sets markVisible = false (Total only).
+ */
+export const MARK = {
+  /** At the turn point the hip must be inside the frame by this fraction of its width. */
+  hipXMargin: 0.05,
+  /** Frames checked around each point (ms, centred on it). */
+  windowMs: 500,
+  /** Fraction of the frames in that window that must pass. */
+  minPassFrac: 0.5,
+} as const;
+
+/** 30-Second Chair Stand detector (lib/analysis/chair.ts). */
+export const CHAIR = {
+  postureHoldMs: 100,
+  /** A low wrist must persist this long to count as arm use (ms). */
+  armsMs: 200,
+  /** "Rising" = hip height within this of the seated/standing midpoint. */
+  risingMargin: 0.25,
+  /** Defaults for the seated/standing hip heights until observed. */
+  defaultSeatedH: 1.15,
+  defaultStandingH: 1.95,
 } as const;

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "lang": "en",
+  "ageBand": "70-74",
+  "sex": "female",
+  "screening": {
+    "unsteady": false,
+    "worry": false,
+    "fallen": true,
+    "fallCount": "2",
+    "injured": false
+  },
+  "tug": {
+    "schemaVersion": 1,
+    "outcome": "refused",
+    "refusalReason": "aborted",
+    "totalSec": null,
+    "riskFlag": null,
+    "timingErrorSec": 0.033,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  },
+  "chair": {
+    "skipped": true
+  }
+}

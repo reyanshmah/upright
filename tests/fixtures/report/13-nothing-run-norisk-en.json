@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "lang": "en",
+  "ageBand": "70-74",
+  "sex": "male",
+  "screening": {
+    "unsteady": false,
+    "worry": false,
+    "fallen": false,
+    "fallCount": null,
+    "injured": null
+  },
+  "tug": null,
+  "chair": null
+}

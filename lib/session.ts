@@ -1,5 +1,7 @@
 import type { Lang } from "./i18n";
 import type { Sex } from "./signal/thresholds";
+import type { ChairStandResult, TugResult } from "./contract";
+import { TUG } from "./signal/thresholds";
 
 export type Runner = "self" | "helper";
 export type WalkingAid = "none" | "cane" | "walker" | "other";
@@ -24,25 +26,6 @@ export interface Screening {
   injured: boolean | null;
 }
 
-/** Where a number came from. "auto" = camera analysis, "manual" = helper's tap/count. */
-export type Source = "auto" | "manual";
-
-export interface TugResult {
-  /** Seconds from "Go" to seated again, measured by the camera. */
-  totalS: number;
-  source: Source;
-  /** Five-phase breakdown (seconds), when the boundaries could be found. */
-  phases?: { standUp: number; walkOut: number; turn: number; walkBack: number; sitDown: number };
-  /** Kept for older saved sessions; no longer collected. */
-  manualS?: number | null;
-  observations?: string[];
-  /** TUG >= 20 s: the app suggests skipping the chair stand for safety. */
-  verySlow: boolean;
-  fpsMedian: number | null;
-  gatesPassed: boolean;
-  camera?: CameraInfo;
-}
-
 /** Which camera recorded the test (for the quality line). */
 export interface CameraInfo {
   label: string;
@@ -50,16 +33,13 @@ export interface CameraInfo {
   wide: boolean;
 }
 
-export interface ChairResult {
-  count: number;
-  armsUsed: boolean;
-  /** Last stand counted under the CDC "more than halfway up at 30 s" rule. */
-  halfwayCounted: boolean;
-  source: Source;
-  fpsMedian: number | null;
-  gatesPassed: boolean;
-  camera?: CameraInfo;
-}
+/**
+ * Stored results ARE the engine contract (lib/contract.ts). Anything the UI
+ * needs beyond the contract is added here as a local extra, never in the contract.
+ */
+export type TugEntry = TugResult & { camera?: CameraInfo };
+/** halfwayCounted: last stand counted under the CDC "more than halfway up at 30 s" rule. */
+export type ChairEntry = ChairStandResult & { halfwayCounted: boolean; camera?: CameraInfo };
 
 export interface BalanceStageResult {
   stage: 1 | 2 | 3 | 4;
@@ -73,7 +53,7 @@ export interface BalanceResult {
   stages: BalanceStageResult[];
   /** CDC: tandem stance (stage 3) held 10 s. */
   tandemHeld10: boolean;
-  source: Source;
+  source: "auto" | "manual";
   fpsMedian: number | null;
   gatesPassed: boolean;
   camera?: CameraInfo;
@@ -93,14 +73,30 @@ export interface SessionState {
   profile: Profile;
   screening: Screening;
   setup?: SetupInfo;
-  tug?: TugResult | { skipped: true; reason: string };
-  chair?: ChairResult | { skipped: true; reason: string };
+  tug?: TugEntry | { skipped: true; reason: string };
+  chair?: ChairEntry | { skipped: true; reason: string };
   balance?: BalanceResult | { skipped: true; reason: string };
   createdAt: string;
 }
 
 export function isSkipped(r: unknown): r is { skipped: true; reason: string } {
   return !!r && typeof r === "object" && "skipped" in r;
+}
+
+/** The TUG entry only if it carries a number (not skipped, not refused). */
+export function tugMeasured(r: SessionState["tug"]): (TugEntry & { totalSec: number }) | null {
+  return r && !isSkipped(r) && r.outcome !== "refused" && r.totalSec !== null ? (r as TugEntry & { totalSec: number }) : null;
+}
+
+/** The chair entry only if it carries a count (not skipped, not refused). */
+export function chairMeasured(r: SessionState["chair"]): (ChairEntry & { stands: number }) | null {
+  return r && !isSkipped(r) && r.outcome !== "refused" && r.stands !== null ? (r as ChairEntry & { stands: number }) : null;
+}
+
+/** TUG >= 20 s: the app suggests skipping the chair stand for safety. */
+export function tugVerySlow(r: SessionState["tug"]): boolean {
+  const m = tugMeasured(r);
+  return !!m && m.totalSec >= TUG.verySlowS;
 }
 
 /** STEADI: a yes to any of the three key questions means screened at risk. */

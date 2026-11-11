@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { STRINGS } from "@/lib/i18n";
-import { isSkipped, loadSession, updateSession, type ChairResult, type SessionState } from "@/lib/session";
+import { STRINGS, type Lang } from "@/lib/i18n";
+import { NeedStart } from "@/components/NeedStart";
+import { AppShell } from "@/components/AppShell";
+import { StatusBadge } from "@/components/StatusBadge";
+import { loadSession, tugVerySlow, updateSession, type ChairEntry, type SessionState } from "@/lib/session";
+import { setLangPref } from "@/lib/langPref";
 import { TestRunner } from "@/components/TestRunner";
 
 export default function ChairPage() {
@@ -16,60 +19,58 @@ export default function ChairPage() {
     setSession(loadSession());
     setLoaded(true);
   }, []);
-  if (!loaded) return <main />;
-  if (!session) {
-    return (
-      <main>
-        <p>Start with the screening questions first.</p>
-        <Link className="btn" href="/start">Start</Link>
-      </main>
-    );
-  }
+  if (!loaded) return null;
+  if (!session) return <NeedStart />;
   const t = STRINGS[session.lang];
-  const verySlow = !!session.tug && !isSkipped(session.tug) && !!session.tug.verySlow;
+  const verySlow = tugVerySlow(session.tug);
+  const onLang = (l: Lang) => {
+    setLangPref(l);
+    updateSession({ lang: l });
+    setSession({ ...session, lang: l });
+  };
 
   // Safety: a very slow TUG (>= 20 s) suggests skipping the chair stand.
   if (verySlow && !override) {
+    const skip = () => {
+      updateSession({ chair: { skipped: true, reason: "TUG took 20 s or more (safety)" } });
+      router.push("/test/balance");
+    };
     return (
-      <main lang={session.lang}>
-        <p className="eyebrow">{t.testOf(2)}</p>
-        <h1>{t.chairName}</h1>
-        <div className="card warn"><p>{t.slowSkipNote}</p></div>
-        <div className="choices">
-          <button
-            className="choice selected"
-            onClick={() => {
-              updateSession({ chair: { skipped: true, reason: "TUG took 20 s or more (safety)" } });
-              router.push("/test/balance");
-            }}
-          >
+      <AppShell
+        lang={session.lang}
+        onLang={onLang}
+        pinned={
+          <button type="button" className="btn btn--primary" onClick={skip}>
             {t.skipTest}
           </button>
-          <button className="choice" onClick={() => setOverride(true)}>{t.doAnyway}</button>
-        </div>
-        <div className="row nav">
-          <Link className="btn secondary" href="/test/tug">{t.back}</Link>
-        </div>
-        <p className="disclaimer">{t.disclaimer}</p>
-      </main>
+        }
+      >
+        <p className="eyebrow">{t.testOf(2)}</p>
+        <h1 className="h1">{t.chairName}</h1>
+        <StatusBadge kind="risk">{t.slowSkipNote}</StatusBadge>
+        <button type="button" className="btn btn--secondary" onClick={() => setOverride(true)}>
+          {t.doAnyway}
+        </button>
+        <button type="button" className="btn btn--secondary" onClick={() => router.push("/test/tug")}>
+          {t.back}
+        </button>
+      </AppShell>
     );
   }
 
   return (
-    <main lang={session.lang}>
-      <TestRunner
-        kind="chair"
-        lang={session.lang}
-        age={session.profile.age}
-        sex={session.profile.sex}
-        onSaved={(r) => updateSession({ chair: r as ChairResult })}
-        onSkip={(reason) => {
-          updateSession({ chair: { skipped: true, reason } });
-          router.push("/test/balance");
-        }}
-        onNext={() => router.push("/test/balance")}
-      />
-      <p className="disclaimer">{t.disclaimer}</p>
-    </main>
+    <TestRunner
+      kind="chair"
+      lang={session.lang}
+      onLang={onLang}
+      age={session.profile.age}
+      sex={session.profile.sex}
+      onSaved={(r) => updateSession({ chair: r as ChairEntry })}
+      onSkip={(reason) => {
+        updateSession({ chair: { skipped: true, reason } });
+        router.push("/test/balance");
+      }}
+      onNext={() => router.push("/test/balance")}
+    />
   );
 }

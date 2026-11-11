@@ -8,7 +8,7 @@
  * result always recommends a doctor visit; never suggest stopping a medicine.
  */
 import type { Lang } from "./i18n";
-import { isSkipped, screenedAtRisk, type SessionState } from "./session";
+import { chairMeasured, isSkipped, screenedAtRisk, tugMeasured, type SessionState } from "./session";
 import { scoreChairStand, tugAtRisk } from "./signal/thresholds";
 
 export type StepKey = "doctor" | "exercise" | "meds" | "home" | "repeat";
@@ -29,22 +29,23 @@ export interface ReportFacts {
 }
 
 export function reportFacts(s: SessionState): ReportFacts {
-  const tug = s.tug && !isSkipped(s.tug) ? s.tug : null;
-  const chair = s.chair && !isSkipped(s.chair) ? s.chair : null;
-  const sc = chair ? scoreChairStand(chair.count, chair.armsUsed, s.profile.age, s.profile.sex) : null;
+  // Refused tests carry no number, so they never reach the report.
+  const tug = tugMeasured(s.tug);
+  const chair = chairMeasured(s.chair);
+  const sc = chair ? scoreChairStand(chair.stands, chair.armUse, s.profile.age, s.profile.sex) : null;
   const bal = s.balance && !isSkipped(s.balance) ? s.balance : null;
   const balRisk = bal ? !bal.tandemHeld10 : null;
   const screen = screenedAtRisk(s.screening);
-  const tRisk = tug ? tugAtRisk(tug.totalS) : null;
+  const tRisk = tug ? tugAtRisk(tug.totalSec) : null;
   const cBelow = sc ? sc.belowAverage : null;
   return {
     screenedAtRisk: screen,
-    tugS: tug ? tug.totalS : null,
+    tugS: tug ? tug.totalSec : null,
     tugAtRisk: tRisk,
     chairScore: sc ? sc.score : null,
     chairNorm: sc ? sc.norm : null,
     chairBelow: cBelow,
-    armsUsed: chair ? chair.armsUsed : null,
+    armsUsed: chair ? chair.armUse : null,
     balanceAtRisk: balRisk,
     injuredFall: !!s.screening.injured,
     multipleFalls: s.screening.fallCount === "2" || s.screening.fallCount === "3+",

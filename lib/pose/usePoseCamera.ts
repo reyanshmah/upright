@@ -5,8 +5,9 @@ import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { createPoseLandmarker, SKELETON_EDGES, type ModelVariant } from "./landmarker";
 import { missingParts, type BodyPart } from "../signal/geometry";
 import { StableFlag } from "../signal/gate";
-import { ALGO } from "../signal/thresholds";
+import { ALGO, GATES } from "../signal/thresholds";
 import type { Landmark, PoseFrame } from "../signal/types";
+import { toRecorded } from "../signal/privacy";
 
 export type Facing = "environment" | "user";
 
@@ -76,6 +77,8 @@ export interface FrameInfo {
   gatesOk: boolean;
   bodyOk: boolean;
   fpsOk: boolean;
+  /** Smoothed: exactly one person in view. */
+  personOk: boolean;
 }
 
 export interface Gates {
@@ -104,9 +107,9 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const frameTimes = useRef<number[]>([]);
   const recording = useRef<PoseFrame[] | null>(null);
   const fpsLog = useRef<number[]>([]);
-  const bodyFlag = useRef(new StableFlag(300, 600));
-  const personFlag = useRef(new StableFlag(300, 600));
-  const fpsFlag = useRef(new StableFlag(500, 1000));
+  const bodyFlag = useRef(new StableFlag(GATES.body.onMs, GATES.body.offMs));
+  const personFlag = useRef(new StableFlag(GATES.onePerson.onMs, GATES.onePerson.offMs));
+  const fpsFlag = useRef(new StableFlag(GATES.fps.onMs, GATES.fps.offMs));
   const lastMissing = useRef<BodyPart[]>([]);
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
@@ -184,9 +187,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
       if (recording.current) {
         recording.current.push({
           t,
-          landmarks: main
-            ? main.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 0 }))
-            : null,
+          landmarks: toRecorded(main),
         });
         fpsLog.current.push(fps);
       }
@@ -199,7 +200,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
         missing: lastMissing.current,
         ok,
       });
-      onFrameRef.current?.({ t, main, people: people.length, w, h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk });
+      onFrameRef.current?.({ t, main, people: people.length, w, h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk, personOk: onePerson });
     }
     rafRef.current = requestAnimationFrame(loop);
   }, []);

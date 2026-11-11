@@ -8,7 +8,7 @@
  *   moves a wrist down to the thighs/seat during a rise.
  */
 import { PostureTracker, type Feat } from "./features";
-import { ALGO } from "../signal/thresholds";
+import { ALGO, CHAIR } from "../signal/thresholds";
 
 export interface ChairLive {
   count: number;
@@ -18,10 +18,8 @@ export interface ChairLive {
   halfwayCounted: boolean;
 }
 
-const ARMS_MS = 200;
-
 export class ChairDetector {
-  private posture = new PostureTracker(100);
+  private posture = new PostureTracker(CHAIR.postureHoldMs);
   private goT: number | null = null;
   count = 0;
   armsUsed = false;
@@ -57,10 +55,10 @@ export class ChairDetector {
     if (changed && state === "STANDING" && this.posture.since >= this.goT) this.count++;
 
     // Arm use: a wrist low on the body while rising (not yet standing).
-    const rising = state === "SEATED" && f.hipH > this.midH() - 0.25;
+    const rising = state === "SEATED" && f.hipH > this.midH() - CHAIR.risingMargin;
     if ((rising || state === "BETWEEN") && f.wristLow === true) {
       this.armsLowSince ??= f.t;
-      if (f.t - this.armsLowSince >= ARMS_MS) this.armsUsed = true;
+      if (f.t - this.armsLowSince >= CHAIR.armsMs) this.armsUsed = true;
     } else this.armsLowSince = null;
 
     return this.snapshot(t);
@@ -72,7 +70,7 @@ export class ChairDetector {
       const s = [...xs].sort((a, b) => a - b);
       return s[Math.floor(s.length / 2)];
     };
-    return (med(this.seatedH, 1.15) + med(this.standingH, 1.95)) / 2;
+    return (med(this.seatedH, CHAIR.defaultSeatedH) + med(this.standingH, CHAIR.defaultStandingH)) / 2;
   }
 
   private finish(t: number): ChairLive {

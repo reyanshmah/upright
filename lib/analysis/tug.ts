@@ -9,6 +9,7 @@
  * lengths (3 m is ~6-7 shank lengths), so no camera calibration is needed.
  */
 import { FeatureExtractor, PostureTracker, classify, type Feat, type Posture } from "./features";
+import { TUG } from "../signal/thresholds";
 
 export type TugPhase = "waiting" | "standUp" | "walkOut" | "turn" | "walkBack" | "sitDown" | "done" | "failed";
 
@@ -27,14 +28,9 @@ export interface TugLive {
   failReason?: "timeout" | "lost" | "notSeatedAtStart";
 }
 
-const LEFT_CHAIR = 2.5; // shank lengths (~1.1 m) = they really walked away
-const MIN_TURN_D = 3.5; // must get at least this far before a turn counts
-const BACK_NEAR = 2.5; // within this of the chair = back at the chair
-const TIMEOUT_MS = 90_000;
-const LOST_MS = 5_000;
 
 export class TugDetector {
-  private posture = new PostureTracker(150);
+  private posture = new PostureTracker(TUG.postureHoldMs);
   private chairX: number | null = null;
   private preSeatedX: number[] = [];
   private sitRunSince: number | null = null;
@@ -46,6 +42,8 @@ export class TugDetector {
   private lastValidT = 0;
   private recent: { t: number; d: number }[] = [];
   phase: TugPhase = "waiting";
+  /** Why the run failed, once phase === "failed". */
+  failReason: TugLive["failReason"] | null = null;
   standT: number | null = null;
   endT: number | null = null;
   readonly feats: { f: Feat; d: number | null; raw: Posture }[] = [];
@@ -68,8 +66,8 @@ export class TugDetector {
   push(f: Feat | null, t: number): TugLive {
     if (this.phase === "done" || this.phase === "failed") return this.snapshot();
     if (!f) {
-      if (this.goT !== null && t - this.lastValidT > LOST_MS) return this.fail("lost");
-      if (this.goT !== null && t - this.goT > TIMEOUT_MS) return this.fail("timeout");
+      if (this.goT !== null && t - this.lastValidT > TUG.lostMs) return this.fail("lost");
+      if (this.goT !== null && t - this.goT > TUG.timeoutMs) return this.fail("timeout");
       return this.snapshot();
     }
     this.lastValidT = t;
@@ -79,7 +77,7 @@ export class TugDetector {
       // Before Go: learn where the chair is from seated frames (last ~1 s).
       if (state === "SEATED") {
         this.preSeatedX.push(f.hipX);
-        if (this.preSeatedX.length > 45) this.preSeatedX.shift();
+        if (this.preSeatedX.length > TUG.preSeatedFrames) this.preSeatedX.shift();
       }
       this.feats.push({ f, d: null, raw });
       return this.snapshot();
@@ -89,7 +87,7 @@ export class TugDetector {
     const d = Math.abs(f.hipX - this.chairX) / f.shank;
     this.feats.push({ f, d, raw });
     this.recent.push({ t: f.t, d });
-    while (this.recent.length && f.t - this.recent[0].t > 400) this.recent.shift();
+    while (this.recent.length && f.t - this.recent[0].t > TUG.speedWindowMs) this.recent.shift();
 
     if (!this.stood && state === "STANDING") {
       this.stood = true;
@@ -97,40 +95,40 @@ export class TugDetector {
     }
     // Backup: if they've clearly walked away from the chair, they stood up.
     // Stand time = first frame after Go with the hip clearly raised.
-    if (!this.stood && d > 1.5 && raw !== "SEATED") {
+    if (!this.stood && d > TUG.backupStandD && raw !== "SEATED") {
       this.stood = true;
-      const up = this.feats.find((x) => x.d !== null && x.f.t >= this.goT! && x.f.hipH > 1.5);
+      const up = this.feats.find((x) => x.d !== null && x.f.t >= this.goT! && x.f.hipH > TUG.backupStandHipH);
       this.standT = up ? up.f.t : f.t;
     }
     this.maxD = Math.max(this.maxD, d);
-    if (!this.turned && this.maxD >= MIN_TURN_D && d < this.maxD - 1.0) this.turned = true;
+    if (!this.turned && this.maxD >= TUG.minTurnD && d < this.maxD - TUG.turnDropD) this.turned = true;
 
     // Live phase label
     if (!this.stood) this.phase = "standUp";
     else if (!this.turned) {
       const v = this.speed();
-      this.phase = this.maxD >= LEFT_CHAIR && d > 0.7 * this.maxD && Math.abs(v) < 0.8 ? "turn" : "walkOut";
-    } else this.phase = d < BACK_NEAR ? "sitDown" : "walkBack";
+      this.phase = this.maxD >= TUG.leftChair && d > TUG.turnNearMaxFrac * this.maxD && Math.abs(v) < TUG.turnSpeed ? "turn" : "walkOut";
+    } else this.phase = d < TUG.backNear ? "sitDown" : "walkBack";
 
     // End: a NEW sit-down (after standing and turning), back at the chair,
-    // held 300 ms. End time = the start of that seated run.
+    // held TUG.seatedFinalHoldMs. End time = the start of that seated run.
     if (this.stood && this.turned && this.standT !== null) {
       if (raw === "SEATED") {
-        if (this.sitRunSince === null || f.t - this.lastSitT > 500) this.sitRunSince = f.t;
+        if (this.sitRunSince === null || f.t - this.lastSitT > TUG.sitRunGapMs) this.sitRunSince = f.t;
         this.lastSitT = f.t;
       } else if (raw === "STANDING") this.sitRunSince = null;
       if (
         this.sitRunSince !== null &&
         this.sitRunSince > this.standT &&
-        f.t - this.sitRunSince >= 300 &&
-        d < BACK_NEAR + 0.5
+        f.t - this.sitRunSince >= TUG.seatedFinalHoldMs &&
+        d < TUG.backNear + TUG.endExtraD
       ) {
         this.endT = this.sitRunSince;
         this.phase = "done";
         return this.snapshot();
       }
     }
-    if (t - this.goT > TIMEOUT_MS) return this.fail("timeout");
+    if (t - this.goT > TUG.timeoutMs) return this.fail("timeout");
     return this.snapshot();
   }
 
@@ -144,6 +142,7 @@ export class TugDetector {
 
   private fail(reason: TugLive["failReason"]): TugLive {
     this.phase = "failed";
+    this.failReason = reason;
     return { phase: "failed", done: false, failReason: reason };
   }
 
@@ -156,15 +155,26 @@ export class TugDetector {
     };
   }
 
+  /** Time (ms) of the turn point: the farthest distance from the chair between Go and the end. */
+  turnPointT(): number | null {
+    if (this.goT === null || this.endT === null) return null;
+    let best: { t: number; d: number } | null = null;
+    for (const x of this.feats) {
+      if (x.d === null || x.f.t < this.goT || x.f.t > this.endT) continue;
+      if (!best || x.d > best.d) best = { t: x.f.t, d: x.d };
+    }
+    return best ? best.t : null;
+  }
+
   /** Five phases from the recorded series. Null if the boundaries don't line up. */
   phases(): TugPhases | null {
     if (this.goT === null || this.standT === null || this.endT === null) return null;
     const after = this.feats.filter((x) => x.d !== null && x.f.t >= this.goT! && x.f.t <= this.endT!);
-    if (after.length < 10) return null;
+    if (after.length < TUG.phaseMinFrames) return null;
 
     // Smoothed velocity of displacement (linear fit over +-250 ms).
     const v = after.map((x, i) => {
-      const win = after.filter((y) => Math.abs(y.f.t - x.f.t) <= 250);
+      const win = after.filter((y) => Math.abs(y.f.t - x.f.t) <= TUG.phaseSmoothMs);
       const n = win.length;
       if (n < 3) return 0;
       const mt = win.reduce((a, y) => a + y.f.t, 0) / n;
@@ -185,13 +195,13 @@ export class TugDetector {
     const outV = v.slice(0, iMax).filter((x) => x > 0).sort((a, b) => a - b);
     const backV = v.slice(iMax).filter((x) => x < 0).map(Math.abs).sort((a, b) => a - b);
     if (!outV.length || !backV.length) return null;
-    const vOut = outV[Math.floor(outV.length * 0.8)];
-    const vBack = backV[Math.floor(backV.length * 0.8)];
+    const vOut = outV[Math.floor(outV.length * TUG.phaseSpeedPercentile)];
+    const vBack = backV[Math.floor(backV.length * TUG.phaseSpeedPercentile)];
 
     let iTurnStart = iMax;
-    for (let i = iMax; i >= 0; i--) if (v[i] > 0.3 * vOut) { iTurnStart = i; break; }
+    for (let i = iMax; i >= 0; i--) if (v[i] > TUG.phaseEdgeFrac * vOut) { iTurnStart = i; break; }
     let iTurnEnd = iMax;
-    for (let i = iMax; i < after.length; i++) if (v[i] < -0.3 * vBack) { iTurnEnd = i; break; }
+    for (let i = iMax; i < after.length; i++) if (v[i] < -TUG.phaseEdgeFrac * vBack) { iTurnEnd = i; break; }
 
     // Sit-down starts when they were last standing.
     let iSit = after.length - 1;

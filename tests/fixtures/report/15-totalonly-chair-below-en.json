@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "lang": "en",
+  "ageBand": "75-79",
+  "sex": "male",
+  "screening": {
+    "unsteady": false,
+    "worry": false,
+    "fallen": false,
+    "fallCount": null,
+    "injured": null
+  },
+  "tug": {
+    "schemaVersion": 1,
+    "outcome": "total_only",
+    "totalSec": 10.0,
+    "riskFlag": false,
+    "timingErrorSec": 0.033,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  },
+  "chair": {
+    "schemaVersion": 1,
+    "outcome": "full",
+    "stands": 10,
+    "armUse": false,
+    "belowNorm": true,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  }
+}

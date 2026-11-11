@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { STRINGS, type Lang } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
-import { CameraStage, GateBadges } from "@/components/CameraStage";
+import { CameraStage } from "@/components/CameraStage";
+import { AppShell } from "@/components/AppShell";
+import { StatusBadge } from "@/components/StatusBadge";
+import { gateRows, type GateRow } from "@/components/TestScreens";
 import { playCue, playCueAndWait, unlockAudio, type CueId } from "@/lib/voice";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
 import { angleDeg } from "@/lib/signal/geometry";
@@ -19,11 +22,13 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function BalanceRunner({
   lang,
+  onLang,
   onSaved,
   onSkip,
   onNext,
 }: {
   lang: Lang;
+  onLang: (l: Lang) => void;
   onSaved: (r: BalanceResult) => void;
   onSkip: (reason: string) => void;
   onNext: () => void;
@@ -202,15 +207,100 @@ export function BalanceRunner({
   const gateReady = gateHeldMs >= GATE_HOLD_MS;
   const remaining = Math.max(0, Math.ceil(HOLD_S - holdS));
 
+  // Same gate rows as the other tests, with "standing" in place of "seated".
+  const rows: GateRow[] = [
+    ...gateRows("tug", cam.gates, true, false, t).filter((r) => r.id !== "seated"),
+    { id: "standing" as const, ok: standing, text: standing ? t.gateStanding : t.gateNotStanding },
+  ].sort((x, y) => Number(x.ok) - Number(y.ok));
+  const allOk = rows.every((r) => r.ok);
+  const firstFailing = rows.find((r) => !r.ok);
+  const showCam = phase === "position" || phase === "running";
+  const viewLabel =
+    view === "hold" ? t.balHoldLabel : view === "wait" ? t.balGetInto : view === "held" ? t.balGood : view === "moved" ? t.balFoot : "";
+
+  let pinned: ReactNode = null;
+  if (phase === "intro") {
+    pinned = (
+      <button type="button" className="btn btn--primary" onClick={openCamera}>
+        {t.checkPosition}
+      </button>
+    );
+  } else if (phase === "position") {
+    pinned = allOk ? (
+      <button type="button" className="btn btn--primary" disabled={!gateReady} onClick={() => void run()}>
+        {t.startTest}
+      </button>
+    ) : (
+      <button
+        type="button"
+        className="btn btn--notready"
+        aria-disabled="true"
+        onClick={() => document.getElementById("gate-list")?.scrollIntoView({ block: "center" })}
+      >
+        {t.fixItems}
+      </button>
+    );
+  } else if (phase === "running") {
+    pinned = (
+      <button type="button" className="btn btn--stop" onClick={abort}>
+        {t.abort}
+      </button>
+    );
+  } else if (phase === "aborted" || phase === "failed") {
+    pinned = (
+      <button type="button" className="btn btn--primary" onClick={openCamera}>
+        {t.redoTest}
+      </button>
+    );
+  } else if (phase === "done") {
+    pinned = (
+      <button type="button" className="btn btn--primary" onClick={onNext}>
+        {t.seeResults}
+      </button>
+    );
+  }
+
   return (
-    <section>
+    <AppShell lang={lang} onLang={onLang} pinned={pinned}>
       <p className="eyebrow">{t.testOf(3)}</p>
-      <h1>{t.balName}</h1>
+      <h1 className={phase === "running" ? "h1 h1--compact" : "h1"}>{t.balName}</h1>
+
+      {phase === "position" && firstFailing ? <p className="live-status">{firstFailing.text}</p> : null}
+
+      {phase === "running" ? (
+        <div className="live" role="timer" aria-live="off">
+          {view === "hold" ? <p className="num timer">{remaining}</p> : null}
+          <p className="live-status">
+            {t.balStageLabel(stage)}
+            {viewLabel ? `: ${viewLabel}` : ""}
+          </p>
+        </div>
+      ) : null}
+
+      {phase === "running" && (
+        <div className="stance-card">
+          <StanceIcon stage={stage} big />
+          <p className="instruction">{t.balStages[stage]}</p>
+        </div>
+      )}
+
+      {/* One slot for the camera so the video element is never remounted. */}
+      {showCam ? (
+        <>
+          {cam.status === "loading" ? <p className="muted">{t.loadingCamera}</p> : null}
+          {cam.error ? (
+            <StatusBadge kind="risk">
+              {t.cameraError} {cam.error}
+            </StatusBadge>
+          ) : null}
+          <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} overlay={null} />
+        </>
+      ) : null}
 
       {phase === "intro" && (
         <>
           <p className="muted">{t.balWhat}</p>
-          <ol className="steps big-steps">
+          <ol className="steps">
             {([1, 2, 3, 4] as Stage[]).map((s) => (
               <li key={s}>
                 <StanceIcon stage={s} /> {t.balStages[s]}
@@ -220,36 +310,12 @@ export function BalanceRunner({
           <ul className="small-list">
             {t.balRules.map((r, i) => <li key={i}>{r}</li>)}
           </ul>
-          <h2>{t.placementTitle}</h2>
+          <h2 className="h2">{t.placementTitle}</h2>
           <p>{t.balPlace}</p>
           <p className="note">{t.spotterTip}</p>
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => onSkip("user skipped")}>{t.skipTest}</button>
-            <button className="btn" onClick={openCamera}>{t.checkPosition}</button>
-          </div>
-        </>
-      )}
-
-      {(phase === "position" || phase === "running") && (
-        <>
-          {cam.status === "loading" && <p className="muted">{t.loadingCamera}</p>}
-          {cam.error && <p className="note bad">{t.cameraError} {cam.error}</p>}
-          <CameraStage
-            videoRef={cam.videoRef}
-            canvasRef={cam.canvasRef}
-            overlay={
-              phase === "running" ? (
-                <div className="live-hud">
-                  {view === "hold" && <div className="big-readout">{remaining}</div>}
-                  {view === "held" && <div className="big-readout ok">✓</div>}
-                  <div className="live-label">
-                    {t.balStageLabel(stage)} ·{" "}
-                    {view === "hold" ? t.balHoldLabel : view === "wait" ? t.balGetInto : view === "held" ? t.balGood : view === "moved" ? t.balFoot : ""}
-                  </div>
-                </div>
-              ) : null
-            }
-          />
+          <button type="button" className="btn btn--secondary" onClick={() => onSkip("user skipped")}>
+            {t.skipTest}
+          </button>
         </>
       )}
 
@@ -258,78 +324,76 @@ export function BalanceRunner({
           {cam.camera && (
             <p className="camline">
               {cam.camera.wide ? t.camWide : t.camNormal}{" "}
-              <button className="linkish" onClick={() => { fx.current = null; void cam.switchCamera(); }}>{t.camSwitch}</button>
+              <button type="button" className="linkish" onClick={() => { fx.current = null; void cam.switchCamera(); }}>
+                {t.camSwitch}
+              </button>
             </p>
           )}
-          <GateBadges gates={cam.gates} t={t} />
-          <ul className="gates">
-            <li className={standing ? "ok" : "bad"}>
-              <span aria-hidden>{standing ? "✓" : "✗"}</span> {standing ? t.gateStanding : t.gateNotStanding}
-            </li>
+          <ul className="gate-list" id="gate-list" aria-live="polite">
+            {rows.map((r) => (
+              <li key={r.id}>
+                <StatusBadge kind={r.ok ? "ok" : "risk"}>{r.text}</StatusBadge>
+              </li>
+            ))}
           </ul>
-          {!gateReady && cam.status === "running" && <p className="muted">{t.gatesWaiting}</p>}
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => { cam.stop(); setPhase("intro"); }}>{t.back}</button>
-            <button className="btn" disabled={!gateReady} onClick={() => void run()}>{t.startTest}</button>
-          </div>
-        </>
-      )}
-
-      {phase === "running" && (
-        <>
-          <div className="stance-card">
-            <StanceIcon stage={stage} big />
-            <p className="instruction">{t.balStages[stage]}</p>
-          </div>
-          <button className="btn danger" onClick={abort}>{t.abort}</button>
+          <button type="button" className="btn btn--secondary" onClick={() => { cam.stop(); setPhase("intro"); }}>
+            {t.back}
+          </button>
         </>
       )}
 
       {phase === "aborted" && (
         <>
-          <p className="note">{t.aborted}</p>
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => onSkip("stopped for safety")}>{t.skipTest}</button>
-            <button className="btn" onClick={openCamera}>{t.redo}</button>
-          </div>
+          <StatusBadge kind="none">{t.aborted}</StatusBadge>
+          <button type="button" className="btn btn--secondary" onClick={() => onSkip("stopped for safety")}>
+            {t.skipTest}
+          </button>
         </>
       )}
 
       {phase === "failed" && (
         <>
-          <div className="card warn">
-            <p className="big">{t.failTitle}</p>
+          <div className="card result">
+            <StatusBadge kind="none">{t.badgeRefused}</StatusBadge>
             <p>{t.balLost}</p>
           </div>
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => onSkip("could not measure")}>{t.skipTest}</button>
-            <button className="btn" onClick={openCamera}>{t.redo}</button>
-          </div>
-          {stream.current && <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>}
+          <button type="button" className="btn btn--secondary" onClick={() => onSkip("could not measure")}>
+            {t.skipTest}
+          </button>
+          {stream.current && (
+            <button type="button" className="linkish" onClick={downloadStream}>
+              {t.downloadData}
+            </button>
+          )}
         </>
       )}
 
       {phase === "done" && saved && (
         <>
-          <p className="note">{t.autoMeasured}</p>
-          <div className={`card ${saved.tandemHeld10 ? "okcard" : "warn"}`}>
-            <p className="big">{saved.tandemHeld10 ? t.balTandemOk : t.balTandemRisk}</p>
+          <p className="muted">{t.autoMeasured}</p>
+          <div className="card result">
+            <StatusBadge kind={saved.tandemHeld10 ? "ok" : "risk"}>
+              {saved.tandemHeld10 ? t.balTandemOk : t.balTandemRisk}
+            </StatusBadge>
+            <BalanceTable result={saved} t={t} />
           </div>
-          <BalanceTable result={saved} t={t} />
-          <div className="row nav">
-            <button className="btn secondary" onClick={openCamera}>{t.redo}</button>
-            <button className="btn" onClick={onNext}>{t.seeResults}</button>
-          </div>
-          {stream.current && <button className="linkish" onClick={downloadStream}>{t.downloadData}</button>}
+          <button type="button" className="btn btn--secondary" onClick={openCamera}>
+            {t.redoTest}
+          </button>
+          {stream.current && (
+            <button type="button" className="linkish" onClick={downloadStream}>
+              {t.downloadData}
+            </button>
+          )}
         </>
       )}
-    </section>
+    </AppShell>
   );
 }
 
 export function BalanceTable({ result, t }: { result: BalanceResult; t: (typeof STRINGS)["en"] }) {
   return (
-    <ul className="summary">
+    <ul className="rows">
       {([1, 2, 3, 4] as Stage[]).map((s) => {
         const r = result.stages.find((x) => x.stage === s);
         return (
@@ -339,12 +403,11 @@ export function BalanceTable({ result, t }: { result: BalanceResult; t: (typeof 
             </span>
             <span>
               {r ? (
-                <>
-                  {t.balHeld(r.heldS.toFixed(1))}{" "}
-                  <span className={`chip ${r.completed ? "ok" : "risk"}`}>{r.completed ? "✓" : "✗"}</span>
-                </>
+                <StatusBadge kind={r.completed ? "ok" : "risk"}>
+                  {r.completed ? t.balHeld(r.heldS.toFixed(1)) : `${t.balHeld(r.heldS.toFixed(1))}, ${t.balFoot}`}
+                </StatusBadge>
               ) : (
-                <span className="chip na">—</span>
+                <StatusBadge kind="none">{t.skipped}</StatusBadge>
               )}
             </span>
           </li>

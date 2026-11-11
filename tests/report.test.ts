@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { reportFacts, stepOrder } from "../lib/report";
-import type { SessionState } from "../lib/session";
+import type { ChairEntry, SessionState, TugEntry } from "../lib/session";
 import { pixelsPerMeter, distanceM, EYE_HEIGHT_RATIO } from "../lib/measure";
 
 const base: SessionState = {
@@ -10,8 +10,13 @@ const base: SessionState = {
   screening: { unsteady: false, worry: false, fallen: false, fallCount: null, injured: null },
   createdAt: "2026-11-08T00:00:00Z",
 };
-const tug = (s: number) => ({ totalS: s, source: "auto" as const, verySlow: s >= 20, fpsMedian: 30, gatesPassed: true });
-const chair = (n: number, arms = false) => ({ count: n, armsUsed: arms, halfwayCounted: false, source: "auto" as const, fpsMedian: 30, gatesPassed: true });
+const gates = { medianFps: 30, gateLog: [] };
+const tug = (s: number): TugEntry => ({
+  schemaVersion: 1, outcome: "total_only", totalSec: s, riskFlag: s >= 12, timingErrorSec: 0.033, ...gates,
+});
+const chair = (n: number, arms = false): ChairEntry => ({
+  schemaVersion: 1, outcome: "full", stands: n, armUse: arms, belowNorm: null, halfwayCounted: false, ...gates,
+});
 
 describe("report", () => {
   it("no risk -> exercise, home, repeat (no doctor-first)", () => {
@@ -32,6 +37,21 @@ describe("report", () => {
     const f = reportFacts({ ...base, tug: tug(9), chair: chair(15, true) });
     expect(f.chairScore).toBe(0);
     expect(f.chairBelow).toBe(true);
+  });
+  it("a refused test carries no number, so it never reaches the report", () => {
+    const refusedTug: TugEntry = {
+      schemaVersion: 1, outcome: "refused", refusalReason: "second_person", totalSec: null, riskFlag: null,
+      timingErrorSec: 0.033, ...gates,
+    };
+    const refusedChair: ChairEntry = {
+      schemaVersion: 1, outcome: "refused", refusalReason: "fps_low", stands: null, armUse: false, belowNorm: null,
+      halfwayCounted: false, ...gates,
+    };
+    const f = reportFacts({ ...base, tug: refusedTug, chair: refusedChair });
+    expect(f.tugS).toBeNull();
+    expect(f.tugAtRisk).toBeNull();
+    expect(f.chairScore).toBeNull();
+    expect(f.higherRisk).toBe(false);
   });
   it("every higher-risk plan recommends the doctor", () => {
     for (const s of [tug(13), tug(20)]) {

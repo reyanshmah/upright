@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { STRINGS, type Lang } from "@/lib/i18n";
+import { getLangPref, setLangPref } from "@/lib/langPref";
+import { AppShell } from "@/components/AppShell";
 import {
   saveSession,
   screenedAtRisk,
@@ -62,6 +64,14 @@ export default function Start() {
   const [fallen, setFallen] = useState<YesNo>(null);
   const [fallCount, setFallCount] = useState<FallCount | null>(null);
   const [injured, setInjured] = useState<YesNo>(null);
+  useEffect(() => {
+    const pref = getLangPref();
+    if (pref) setLang(pref);
+  }, []);
+  const chooseLang = (l: Lang) => {
+    setLangPref(l);
+    setLang(l);
+  };
 
   const t = STRINGS[lang];
   const yesNo = [
@@ -137,8 +147,19 @@ export default function Start() {
   });
   const name = firstName.trim();
 
+  const pinned =
+    step === "who" ? (
+      <button type="button" className="btn btn--primary" disabled={!runner} onClick={() => go(1)}>{t.next}</button>
+    ) : step === "profile" ? (
+      <button type="button" className="btn btn--primary" disabled={!profileDone} onClick={() => go(1)}>{t.next}</button>
+    ) : step === "screen" ? (
+      <button type="button" className="btn btn--primary" disabled={!screenDone} onClick={finishScreening}>{t.next}</button>
+    ) : step === "result" ? (
+      <Link className="btn btn--primary" href="/setup">{t.continueTests}</Link>
+    ) : null;
+
   return (
-    <main lang={lang}>
+    <AppShell lang={step === "lang" ? null : lang} onLang={chooseLang} pinned={pinned}>
       <div className="progress" aria-hidden>
         {ORDER.map((s, i) => (
           <span key={s} className={i <= progress ? "on" : ""} />
@@ -147,13 +168,13 @@ export default function Start() {
 
       {step === "lang" && (
         <section>
-          <h1>{STRINGS.en.langTitle}</h1>
+          <h1 className="h1">{STRINGS.en.langTitle}</h1>
           <p className="muted">{STRINGS.en.langSub}</p>
           <div className="choices big">
-            <button type="button" className="choice" onClick={() => { setLang("en"); setStep("who"); }}>
+            <button type="button" className="choice" onClick={() => { chooseLang("en"); setStep("who"); }}>
               English
             </button>
-            <button type="button" className="choice" onClick={() => { setLang("es"); setStep("who"); }}>
+            <button type="button" className="choice" onClick={() => { chooseLang("es"); setStep("who"); }}>
               Español
             </button>
           </div>
@@ -162,7 +183,7 @@ export default function Start() {
 
       {step === "who" && (
         <section>
-          <h1>{t.whoTitle}</h1>
+          <h1 className="h1">{t.whoTitle}</h1>
           <Choice
             value={runner}
             onChange={setRunner}
@@ -172,16 +193,13 @@ export default function Start() {
             ]}
           />
           {runner && <p className="note">{runner === "helper" ? t.whoHelperNote : t.whoSelfNote}</p>}
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => go(-1)}>{t.back}</button>
-            <button className="btn" disabled={!runner} onClick={() => go(1)}>{t.next}</button>
-          </div>
+          <button type="button" className="btn btn--secondary" onClick={() => go(-1)}>{t.back}</button>
         </section>
       )}
 
       {step === "profile" && (
         <section>
-          <h1>{t.profileTitle}</h1>
+          <h1 className="h1">{t.profileTitle}</h1>
           <p className="muted">{runner === "helper" ? t.profileSubHelper : t.profileSubSelf}</p>
 
           <label className="field">
@@ -298,16 +316,13 @@ export default function Start() {
             {aid && aid !== "none" && <p className="note">{t.aidNote}</p>}
           </div>
 
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => go(-1)}>{t.back}</button>
-            <button className="btn" disabled={!profileDone} onClick={() => go(1)}>{t.next}</button>
-          </div>
+          <button type="button" className="btn btn--secondary" onClick={() => go(-1)}>{t.back}</button>
         </section>
       )}
 
       {step === "screen" && (
         <section>
-          <h1>{t.screenTitle}</h1>
+          <h1 className="h1">{t.screenTitle}</h1>
           <p className="muted">{t.screenSub}</p>
 
           <div className="question">
@@ -354,20 +369,17 @@ export default function Start() {
             </div>
           )}
 
-          <div className="row nav">
-            <button className="btn secondary" onClick={() => go(-1)}>{t.back}</button>
-            <button className="btn" disabled={!screenDone} onClick={finishScreening}>{t.next}</button>
-          </div>
+          <button type="button" className="btn btn--secondary" onClick={() => go(-1)}>{t.back}</button>
         </section>
       )}
 
       {step === "result" && (
         <section>
-          <h1>
+          <h1 className="h1">
             {name ? `${name}: ` : ""}
             {atRisk ? t.resultTitleRisk : t.resultTitleBaseline}
           </h1>
-          <div className={`card ${atRisk ? "warn" : "okcard"}`}>
+          <div className={`card ${atRisk ? "card--risk" : "card--ok"}`}>
             <p>{atRisk ? t.resultBodyRisk : t.resultBodyBaseline}</p>
             {fallen && injured && <p><b>{t.resultInjured}</b></p>}
             {fallen && fallCount !== null && fallCount !== "1" && <p><b>{t.resultTwoPlus}</b></p>}
@@ -379,14 +391,10 @@ export default function Start() {
                 : "La tabla de los CDC para levantarse de la silla cubre de 60 a 94 años, así que esa prueba se mostrará sin comparación."}
             </p>
           )}
-          <div className="row nav">
-            <button className="btn secondary" onClick={reset}>{t.startOver}</button>
-            <Link className="btn" href="/setup">{t.continueTests}</Link>
-          </div>
+          <button type="button" className="btn btn--secondary" onClick={reset}>{t.startOver}</button>
         </section>
       )}
 
-      <p className="disclaimer">{t.disclaimer}</p>
-    </main>
+    </AppShell>
   );
 }

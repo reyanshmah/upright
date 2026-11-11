@@ -12,6 +12,10 @@ export interface TugAnalysis {
   /** Seconds from the go cue to seated again. */
   totalS: number;
   phases?: TugPhases;
+  /** Key moments (ms, stream clock) for the 3 m visibility check. */
+  goT: number;
+  turnT: number | null;
+  endT: number;
 }
 
 export interface ChairAnalysis {
@@ -34,7 +38,13 @@ export function analyzeTug(stream: LandmarkStream): TugAnalysis | null {
     const r = det.push(fx.push(fr.t, fr.landmarks), fr.t);
     if (r.done) {
       const phases = det.phases();
-      return { totalS: r.totalS!, ...(phases ? { phases } : {}) };
+      return {
+        totalS: r.totalS!,
+        ...(phases ? { phases } : {}),
+        goT: stream.goCueT,
+        turnT: det.turnPointT(),
+        endT: det.endT!,
+      };
     }
     if (r.phase === "failed") return null;
   }
@@ -60,3 +70,7 @@ export function analyzeChairStand(stream: LandmarkStream): ChairAnalysis | null 
 }
 
 export { FeatureExtractor, TugDetector, ChairDetector };
+
+export { buildTugResult, buildChairResult, tugMarkVisible } from "./results";
+export { checkMark, type MarkCheck } from "./mark";
+export type { RunContext, ChairBuild } from "./results";

@@ -12,6 +12,7 @@
 import { OneEuroFilter } from "../signal/oneEuro";
 import { angleDeg } from "../signal/geometry";
 import { LM, type Landmark } from "../signal/types";
+import { FEATURES, POSTURE } from "../signal/thresholds";
 
 export interface Feat {
   t: number; // ms (performance.now)
@@ -33,15 +34,13 @@ export type Posture = "SEATED" | "STANDING" | "BETWEEN";
  * walking step (the swing knee bends) still reads as standing.
  */
 export function classify(f: Feat): Posture {
-  if (f.kneeDeg < 125 && f.hipH < 1.45) return "SEATED";
-  if (f.kneeDeg > 140 && f.hipH > 1.55) return "STANDING";
+  if (f.kneeDeg < POSTURE.seatedKneeDeg && f.hipH < POSTURE.seatedHipH) return "SEATED";
+  if (f.kneeDeg > POSTURE.standingKneeDeg && f.hipH > POSTURE.standingHipH) return "STANDING";
   return "BETWEEN";
 }
 
-const MIN_VIS = 0.3;
-
 function usable(p: Landmark | undefined) {
-  return !!p && (p.visibility ?? 0) >= MIN_VIS && p.x > -0.02 && p.x < 1.02 && p.y > -0.02 && p.y < 1.02;
+  return !!p && (p.visibility ?? 0) >= FEATURES.minVisibility && p.x > -FEATURES.frameMargin && p.x < 1 + FEATURES.frameMargin && p.y > -FEATURES.frameMargin && p.y < 1 + FEATURES.frameMargin;
 }
 
 function median(xs: number[]) {
@@ -56,9 +55,9 @@ const LEGS = [
 
 export class FeatureExtractor {
   private shanks: number[] = [];
-  private fx = new OneEuroFilter({ minCutoff: 1.5, beta: 0.01, dCutoff: 1 });
-  private fhip = new OneEuroFilter({ minCutoff: 1.5, beta: 0.01, dCutoff: 1 });
-  private fknee = new OneEuroFilter({ minCutoff: 1.5, beta: 0.02, dCutoff: 1 });
+  private fx = new OneEuroFilter(FEATURES.hipXFilter);
+  private fhip = new OneEuroFilter(FEATURES.hipHFilter);
+  private fknee = new OneEuroFilter(FEATURES.kneeFilter);
 
   constructor(private w: number, private h: number) {}
 
@@ -71,9 +70,9 @@ export class FeatureExtractor {
     for (const l of legs) {
       const k = lms[l.knee], a = lms[l.ankle];
       const len = Math.hypot((k.x - a.x) * W, (k.y - a.y) * H);
-      if (len > 5) this.shanks.push(len);
+      if (len > FEATURES.minShankPx) this.shanks.push(len);
     }
-    while (this.shanks.length > 120) this.shanks.shift();
+    while (this.shanks.length > FEATURES.shankWindow) this.shanks.shift();
     if (!this.shanks.length) return null;
     const shank = median(this.shanks);
 
@@ -95,8 +94,8 @@ export class FeatureExtractor {
     let wristLow: boolean | null = null;
     for (const wi of [LM.leftWrist, LM.rightWrist]) {
       const wr = lms[wi];
-      if (!wr || (wr.visibility ?? 0) < 0.4 || torso <= 0) continue;
-      const low = wr.y * H > shY + 0.65 * torso;
+      if (!wr || (wr.visibility ?? 0) < FEATURES.wristMinVisibility || torso <= 0) continue;
+      const low = wr.y * H > shY + FEATURES.wristLowTorsoFrac * torso;
       wristLow = wristLow === true ? true : low;
     }
 
@@ -119,10 +118,10 @@ export class PostureTracker {
   /** The person's own seated hip height (learned from clearly-seated frames). */
   private seatedH: number[] = [];
 
-  constructor(private holdMs = 150, private gapMs = 500) {}
+  constructor(private holdMs: number = POSTURE.holdMs, private gapMs: number = POSTURE.gapMs) {}
 
   get seatedBase(): number | null {
-    if (this.seatedH.length < 5) return null;
+    if (this.seatedH.length < POSTURE.seatedBaseMinFrames) return null;
     const s = [...this.seatedH].sort((a, b) => a - b);
     return s[Math.floor(s.length / 2)];
   }
@@ -136,13 +135,13 @@ export class PostureTracker {
     const raw = classify(f);
     if (raw === "SEATED") {
       this.seatedH.push(f.hipH);
-      if (this.seatedH.length > 60) this.seatedH.shift();
+      if (this.seatedH.length > POSTURE.seatedBaseWindow) this.seatedH.shift();
       return raw;
     }
     const base = this.seatedBase;
     if (raw === "BETWEEN" && base !== null) {
-      if (f.hipH > base + 0.45 && f.kneeDeg > 135) return "STANDING";
-      if (f.hipH < base + 0.15 && f.kneeDeg < 130) return "SEATED";
+      if (f.hipH > base + POSTURE.relStandingRiseH && f.kneeDeg > POSTURE.relStandingKneeDeg) return "STANDING";
+      if (f.hipH < base + POSTURE.relSeatedRiseH && f.kneeDeg < POSTURE.relSeatedKneeDeg) return "SEATED";
     }
     return raw;
   }

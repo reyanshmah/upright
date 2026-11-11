@@ -16,6 +16,9 @@ const en = {
   continue: "Continue",
   redo: "Redo",
   seconds: "seconds",
+  needStart: "Start with the screening questions first.",
+  needResults: "No results yet.",
+  startBtn: "Start",
 
   langTitle: "Choose a language",
   langSub: "Elija un idioma",
@@ -120,6 +123,20 @@ const en = {
   gateFpsOk: "Camera is fast enough",
   gateFpsBad: "Camera is too slow — close other apps or use better light",
   gatesWaiting: "Waiting until everything is green…",
+
+  // Result quality (MASTER.md: every result carries a label, a refused run has no number)
+  qualityLabel: "Measurement quality",
+  qualityFull: "Full measurement",
+  qualityTotalOnly: "Total time only",
+  qualityRefused: "Couldn't measure",
+  qualityTotalOnlyNote: "We timed the whole test, but could not see every step, so the step-by-step breakdown is hidden.",
+  refusalReasons: {
+    fps_low: "The camera was running too slowly to time this safely. Close other apps, add light, and try again.",
+    second_person: "We saw more than one person. Ask everyone except the person walking to step out of view, then try again.",
+    not_visible_at_start_or_end: "We could not see the whole body the whole time. Move the phone back so hips, knees and feet stay in view, then try again.",
+    aborted: "The test was stopped. No result was saved.",
+    tab_hidden: "The screen changed during the test, so we stopped. Keep this screen open and try again.",
+  },
 
   // Tests shared
   testOf: (n: number) => `Test ${n} of 3`,
@@ -255,6 +272,25 @@ const en = {
   gateStanding: "Standing up straight",
   gateNotStanding: "Stand up, facing the phone",
 
+
+  // App shell and screen copy (fixed wording, Nov 11 design spec)
+  langGroup: "Language",
+  displayTitle: "Text and font",
+  textSizeLabel: "Text size",
+  textStandard: "Standard",
+  textLarge: "Large",
+  fontLabel: "Font",
+  fontStandard: "Standard",
+  fontDyslexic: "Dyslexia-friendly",
+  fixItems: "Fix the items above",
+  seePlan: "See the family plan",
+  redoTest: "Redo the test",
+  goBig: "Go",
+  badgeUnder12: "Under 12 seconds",
+  badgeOver12: "12 seconds or more: higher fall risk",
+  badgeFull: "Full",
+  badgeTotalOnly: "Total only",
+  badgeRefused: "Couldn't measure, redo.",
 };
 
 export type Strings = typeof en;
@@ -269,6 +305,9 @@ const es: Strings = {
   continue: "Continuar",
   redo: "Repetir",
   seconds: "segundos",
+  needStart: "Primero responda las preguntas de evaluación.",
+  needResults: "Todavía no hay resultados.",
+  startBtn: "Empezar",
 
   langTitle: "Choose a language",
   langSub: "Elija un idioma",
@@ -372,6 +411,20 @@ const es: Strings = {
   gatesWaiting: "Esperando a que todo esté en verde…",
 
   testOf: (n: number) => `Prueba ${n} de 3`,
+  // Calidad del resultado
+  qualityLabel: "Calidad de la medición",
+  qualityFull: "Medición completa",
+  qualityTotalOnly: "Solo el tiempo total",
+  qualityRefused: "No se pudo medir",
+  qualityTotalOnlyNote: "Medimos el tiempo de toda la prueba, pero no pudimos ver cada paso, así que se oculta el desglose por pasos.",
+  refusalReasons: {
+    fps_low: "La cámara iba demasiado lenta para medir con seguridad. Cierre otras aplicaciones, ponga más luz e inténtelo de nuevo.",
+    second_person: "Vimos a más de una persona. Pida que todos, menos quien camina, salgan de la imagen e inténtelo de nuevo.",
+    not_visible_at_start_or_end: "No pudimos ver todo el cuerpo todo el tiempo. Aleje el teléfono para que se vean caderas, rodillas y pies e inténtelo de nuevo.",
+    aborted: "Se detuvo la prueba. No se guardó ningún resultado.",
+    tab_hidden: "La pantalla cambió durante la prueba y la detuvimos. Mantenga esta pantalla abierta e inténtelo de nuevo.",
+  },
+
   placementTitle: "Dónde poner el teléfono",
   checkPosition: "Revisar la vista de la cámara",
   startTest: "Empezar la prueba",
@@ -501,6 +554,25 @@ const es: Strings = {
   gateStanding: "De pie y derecho/a",
   gateNotStanding: "Póngase de pie, mirando al teléfono",
 
+
+  // DRAFT Spanish, pending native review (added Nov 11 with the app shell).
+  langGroup: "Idioma",
+  displayTitle: "Letra",
+  textSizeLabel: "Tamaño de letra",
+  textStandard: "Normal",
+  textLarge: "Grande",
+  fontLabel: "Tipo de letra",
+  fontStandard: "Normal",
+  fontDyslexic: "Para dislexia",
+  fixItems: "Corrija los puntos de arriba",
+  seePlan: "Ver el plan para la familia",
+  redoTest: "Repetir la prueba",
+  goBig: "¡Ya!",
+  badgeUnder12: "Menos de 12 segundos",
+  badgeOver12: "12 segundos o más: mayor riesgo de caídas",
+  badgeFull: "Completa",
+  badgeTotalOnly: "Solo el total",
+  badgeRefused: "No se pudo medir, repita.",
 };
 
 export const STRINGS: Record<Lang, Strings> = { en, es };

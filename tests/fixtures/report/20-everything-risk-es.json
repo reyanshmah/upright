@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "lang": "es",
+  "ageBand": "70-74",
+  "sex": "female",
+  "screening": {
+    "unsteady": true,
+    "worry": true,
+    "fallen": true,
+    "fallCount": "3+",
+    "injured": true
+  },
+  "tug": {
+    "schemaVersion": 1,
+    "outcome": "total_only",
+    "totalSec": 12.3,
+    "riskFlag": true,
+    "timingErrorSec": 0.033,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  },
+  "chair": {
+    "schemaVersion": 1,
+    "outcome": "full",
+    "stands": 11,
+    "armUse": true,
+    "belowNorm": true,
+    "medianFps": 30.0,
+    "gateLog": [
+      {
+        "t": -3000,
+        "gate": "body",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "one_person",
+        "ok": true
+      },
+      {
+        "t": -3000,
+        "gate": "fps",
+        "ok": true
+      }
+    ]
+  }
+}

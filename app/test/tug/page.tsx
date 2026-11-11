@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { STRINGS } from "@/lib/i18n";
-import { loadSession, updateSession, type SessionState, type TugResult } from "@/lib/session";
+import type { Lang } from "@/lib/i18n";
+import { NeedStart } from "@/components/NeedStart";
+import { loadSession, updateSession, type SessionState, type TugEntry } from "@/lib/session";
+import { setLangPref } from "@/lib/langPref";
 import { TestRunner } from "@/components/TestRunner";
 
 export default function TugPage() {
@@ -15,31 +16,26 @@ export default function TugPage() {
     setSession(loadSession());
     setLoaded(true);
   }, []);
-  if (!loaded) return <main />;
-  if (!session) {
-    return (
-      <main>
-        <p>Start with the screening questions first.</p>
-        <Link className="btn" href="/start">Start</Link>
-      </main>
-    );
-  }
-  const t = STRINGS[session.lang];
+  if (!loaded) return null;
+  if (!session) return <NeedStart />;
+  const onLang = (l: Lang) => {
+    setLangPref(l);
+    updateSession({ lang: l });
+    setSession({ ...session, lang: l });
+  };
   return (
-    <main lang={session.lang}>
-      <TestRunner
-        kind="tug"
-        lang={session.lang}
-        age={session.profile.age}
-        sex={session.profile.sex}
-        onSaved={(r) => updateSession({ tug: r as TugResult })}
-        onSkip={(reason) => {
-          updateSession({ tug: { skipped: true, reason } });
-          router.push("/test/chair");
-        }}
-        onNext={() => router.push("/test/chair")}
-      />
-      <p className="disclaimer">{t.disclaimer}</p>
-    </main>
+    <TestRunner
+      kind="tug"
+      lang={session.lang}
+      onLang={onLang}
+      age={session.profile.age}
+      sex={session.profile.sex}
+      onSaved={(r) => updateSession({ tug: r as TugEntry })}
+      onSkip={(reason) => {
+        updateSession({ tug: { skipped: true, reason } });
+        router.push("/test/chair");
+      }}
+      onNext={() => router.push("/test/chair")}
+    />
   );
 }

@@ -23,7 +23,7 @@ npx vitest run tests/outcome.test.ts
 npx vitest run tests/signal.test.ts -t "TUG threshold"
 ```
 
-Other scripts: `npm run models` (fetch pose models; skips existing), `node scripts/make-icons.mjs` (regenerate PWA icons), `node scripts/strip-face.mjs in.json > out.json` (blank face landmarks 0–10 in an old stream).
+Other scripts: `npm run models` (fetch pose models; skips existing), `node scripts/make-icons.mjs` (rebuild the app icons from `assets/logo.png`; rounded corners are cut into the PNG alpha), `node scripts/strip-face.mjs in.json > out.json` (blank face landmarks 0–10 in an old stream).
 
 ## Big picture
 
@@ -42,7 +42,7 @@ Upright is a phone-only CDC STEADI fall-risk screen (Timed Up and Go + 30-Second
 
 **Signal layer (`lib/signal/`):** `thresholds.ts` is the one config file (CDC values, `ALGO`, `GATES`, `FEATURES`, `POSTURE`, `TUG`, `CHAIR`, `CONFIG_VERSION`). `gate.ts` has `StableFlag` hysteresis and the gate log; `geometry.ts` has the whole-body gate; `oneEuro.ts` smooths.
 
-**Other modules:** `lib/i18n.ts` (EN/ES; Spanish needs a fluent review), `lib/report.ts` (family plan order + text), `lib/measure.ts` (3 m math), `lib/voice.ts` (MP3 from `public/audio/<lang>/` if present, else browser speech; no MP3s in the repo yet, and `getLastCueSource()` records which was used). `public/sw.js` + `app/manifest.ts` are the PWA shell (the worker registers in production builds only).
+**Other modules:** `lib/i18n.ts` (EN/ES; Spanish needs a fluent review), `lib/report.ts` (family plan order + text), `lib/measure.ts` (3 m math), `lib/voice.ts` (MP3 from `public/audio/<lang>/` if present, else browser speech; `getLastCueSource()` records which was used), `lib/displayPrefs.ts` (text size and dyslexia-font settings, applied as `data-text` / `data-font` on `<html>` before paint). `public/sw.js` + `app/manifest.ts` are the PWA shell (the worker registers in production builds only).
 
 ## Rules for changes (from MASTER.md)
 

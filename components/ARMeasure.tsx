@@ -192,7 +192,7 @@ export function ARMeasure({
   return (
     <section>
       {ar === "unsupported" && (
-        <div className="card warn">
+        <div className="card card--risk">
           <p className="big">{t.unsupportedTitle}</p>
           <p>{t.unsupportedBody}</p>
         </div>
@@ -201,11 +201,11 @@ export function ARMeasure({
         <>
           <p>{t.intro}</p>
           {err && <p className="note bad">{t.error} {err}</p>}
-          <button className="btn" disabled={ar === "checking"} onClick={begin}>{t.start}</button>
+          <button className="btn btn--primary" disabled={ar === "checking"} onClick={begin}>{t.start}</button>
         </>
       )}
       <div className="row nav">
-        <button className="btn secondary" onClick={onBack}>←</button>
+        <button className="btn btn--secondary" onClick={onBack}>←</button>
       </div>
 
       {/* DOM overlay shown on top of the AR camera view */}
@@ -222,16 +222,16 @@ export function ARMeasure({
           )}
         </div>
         <div className="ar-bottom">
-          <button className="btn secondary" onClick={end}>{t.exit}</button>
+          <button className="btn btn--secondary" onClick={end}>{t.exit}</button>
           {stage !== "walk" ? (
-            <button className="btn" disabled={!hasFloor} onClick={setStart}>{t.setStart}</button>
+            <button className="btn btn--primary" disabled={!hasFloor} onClick={setStart}>{t.setStart}</button>
           ) : (
             <>
-              <button className="btn secondary" onClick={() => { startPoint.current = null; setDist(null); setStage("setStart"); }}>
+              <button className="btn btn--secondary" onClick={() => { startPoint.current = null; setDist(null); setStage("setStart"); }}>
                 {t.redoStart}
               </button>
               <button
-                className="btn"
+                className="btn btn--primary"
                 disabled={!atTarget}
                 onClick={() => {
                   const d = dist!;
