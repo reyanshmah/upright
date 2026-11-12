@@ -65,6 +65,7 @@ export default function BalancePage() {
         router.push("/results");
       }}
       onNext={() => router.push("/results")}
+      onBack={() => router.push("/test/chair")}
     />
   );
 }

@@ -29,6 +29,7 @@ export function TestRunner({
   onSaved,
   onSkip,
   onNext,
+  onBack,
 }: {
   kind: Kind;
   lang: Lang;
@@ -38,6 +39,8 @@ export function TestRunner({
   onSaved: (r: TugEntry | ChairEntry) => void;
   onSkip: (reason: string) => void;
   onNext: () => void;
+  /** Back from the intro screen. */
+  onBack?: () => void;
 }) {
   const t = STRINGS[lang];
   const [phase, setPhase] = useState<Phase>("intro");
@@ -360,6 +363,7 @@ export function TestRunner({
         abort,
         redo,
         next: onNext,
+        back: onBack,
         download: downloadStream,
       }}
     />

@@ -5,16 +5,23 @@
  */
 import { anthropicCaller } from "../../../lib/reportgen/anthropic";
 import { generateReport } from "../../../lib/reportgen/generate";
+import { clientKey, makeRateLimiter, readCapped, sameOrigin } from "../../../lib/reportgen/guard";
 import { MAX_BODY_BYTES, validateReportInput } from "../../../lib/reportgen/schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** A family opens results once or twice (and maybe switches language): 20 a minute is plenty. */
+const limited = makeRateLimiter(20, 60_000);
+
 export async function POST(req: Request): Promise<Response> {
-  const text = await req.text();
-  if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) {
-    return Response.json({ error: "body too large" }, { status: 413 });
+  if (!sameOrigin(req)) return Response.json({ error: "cross-site request" }, { status: 403 });
+  const key = clientKey(req);
+  if (key !== null && !limited(key)) {
+    return Response.json({ error: "too many requests" }, { status: 429, headers: { "retry-after": "60" } });
   }
+  const text = await readCapped(req, MAX_BODY_BYTES);
+  if (text === null) return Response.json({ error: "body too large" }, { status: 413 });
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -25,10 +32,13 @@ export async function POST(req: Request): Promise<Response> {
   if (!v.ok) return Response.json({ error: "invalid results JSON", details: v.errors }, { status: 400 });
 
   const result = await generateReport(v.input, anthropicCaller());
-  return Response.json({
-    report: result.report,
-    source: result.source,
-    lang: result.lang,
-    rejectedAttempts: result.rejected.length,
-  });
+  return Response.json(
+    {
+      report: result.report,
+      source: result.source,
+      lang: result.lang,
+      rejectedAttempts: result.rejected.length,
+    },
+    { headers: { "cache-control": "no-store" } },
+  );
 }

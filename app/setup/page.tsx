@@ -46,7 +46,7 @@ export default function Setup() {
 
   const pinned =
     step === "safety" ? (
-      <PinnedRow back={() => router.push("/start")} backLabel={t.back}>
+      <PinnedRow back={() => router.push("/start?resume=1")} backLabel={t.back}>
         <button
           type="button"
           className={`btn ${allChecked ? "btn--primary" : "btn--notready"}`}

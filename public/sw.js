@@ -6,7 +6,8 @@
  * whole app + model so a first offline test is guaranteed.
  * A new worker waits until every tab closes: it never takes over during a test.
  */
-const CACHE = "upright-shell-v1";
+// One cache per build (RegisterSW passes ?v=<build id>); activate deletes the others.
+const CACHE = "upright-shell-" + (new URL(self.location.href).searchParams.get("v") || "v1");
 const STATIC = [/^\/_next\/static\//, /^\/icons\//, /^\/fonts\//, /^\/models\//, /^\/mediapipe\//, /^\/audio\//];
 
 self.addEventListener("install", (event) => {

@@ -6,7 +6,7 @@ import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
 import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
-import { gateRows, type GateRow } from "@/components/TestScreens";
+import { cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
 import { playCue, playCueAndWait, unlockAudio, type CueId } from "@/lib/voice";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
 import { angleDeg } from "@/lib/signal/geometry";
@@ -26,12 +26,14 @@ export function BalanceRunner({
   onSaved,
   onSkip,
   onNext,
+  onBack,
 }: {
   lang: Lang;
   onLang: (l: Lang) => void;
   onSaved: (r: BalanceResult) => void;
   onSkip: (reason: string) => void;
   onNext: () => void;
+  onBack?: () => void;
 }) {
   const t = STRINGS[lang];
   const [phase, setPhase] = useState<Phase>("intro");
@@ -221,9 +223,11 @@ export function BalanceRunner({
   let pinned: ReactNode = null;
   if (phase === "intro") {
     pinned = (
-      <button type="button" className="btn btn--primary" onClick={openCamera}>
-        {t.checkPosition}
-      </button>
+      <PinnedRow back={onBack} backLabel={t.back}>
+        <button type="button" className="btn btn--primary" onClick={openCamera}>
+          {t.checkPosition}
+        </button>
+      </PinnedRow>
     );
   } else if (phase === "position") {
     pinned = (
@@ -292,11 +296,7 @@ export function BalanceRunner({
       {showCam ? (
         <>
           {cam.status === "loading" ? <p className="muted">{t.loadingCamera}</p> : null}
-          {cam.error ? (
-            <StatusBadge kind="risk">
-              {t.cameraError} {cam.error}
-            </StatusBadge>
-          ) : null}
+          {cam.error ? <StatusBadge kind="risk">{cameraErrorText(cam.error, t)}</StatusBadge> : null}
           <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} overlay={null} />
         </>
       ) : null}

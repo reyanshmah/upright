@@ -9,6 +9,8 @@ import { AppShell } from "./AppShell";
 import { StatusBadge } from "./StatusBadge";
 import { TugResultCard } from "./TugResultCard";
 import { ChairResultCard } from "./TestScreens";
+import { Icon } from "./Icon";
+import type { ReportOutput } from "../lib/reportgen/schema";
 import { BalanceTable } from "./BalanceRunner";
 
 const R = {
@@ -53,16 +55,25 @@ const R = {
 };
 
 /** The results screen as a pure function of the session (the page loads it and wires navigation). */
+/** The family plan's state: the on-device plan shows at once; a checked AI plan replaces it if one arrives. */
+export type PlanState =
+  | { state: "loading" }
+  | { state: "ai"; output: ReportOutput }
+  | { state: "standard" }
+  | { state: "offline" };
+
 export function ResultsView({
   s,
   onLang,
   onRedoTug,
   onNewScreen,
+  plan = { state: "standard" },
 }: {
   s: SessionState;
   onLang: (l: Lang) => void;
   onRedoTug: () => void;
   onNewScreen: () => void;
+  plan?: PlanState;
 }) {
   const lang = s.lang;
   const t = STRINGS[lang];
@@ -165,14 +176,28 @@ export function ResultsView({
         </h2>
         {f.injuredFall && <p className="note"><b>{t.resultInjured}</b></p>}
         {f.multipleFalls && <p className="note"><b>{t.resultTwoPlus}</b></p>}
+        {plan.state === "ai" && <p className="lead">{plan.output.familySummary}</p>}
         <ol className="plan">
-          {steps.map((k) => (
-            <li key={k}>
-              <b>{STEP_TEXT[lang][k].title}</b>
-              <p>{STEP_TEXT[lang][k].body}</p>
-            </li>
-          ))}
+          {plan.state === "ai"
+            ? plan.output.familySteps.map((st, i) => (
+                <li key={i}>
+                  <b>{st.title}</b>
+                  <p>{st.body}</p>
+                </li>
+              ))
+            : steps.map((k) => (
+                <li key={k}>
+                  <b>{STEP_TEXT[lang][k].title}</b>
+                  <p>{STEP_TEXT[lang][k].body}</p>
+                </li>
+              ))}
         </ol>
+        {plan.state !== "standard" && (
+          <p className="footnote" aria-live="polite">
+            <Icon name={plan.state === "loading" ? "clock" : "info"} size={20} />
+            <span>{plan.state === "loading" ? t.reportWriting : plan.state === "offline" ? t.reportOffline : t.reportAi}</span>
+          </p>
+        )}
 
         <button type="button" className="btn btn--secondary" onClick={printClinician}>
           {r.print}
@@ -186,6 +211,7 @@ export function ResultsView({
       {/* Always English, one page */}
       <section className="clinician card" lang="en">
         <h2 className="h2">Upright — home fall-risk screen (CDC STEADI)</h2>
+        {plan.state === "ai" && <p>{plan.output.clinicianSummary}</p>}
         <p className="small">
           Date: {date.toLocaleDateString("en-US")} · Run by: {s.runner === "helper" ? "family member/helper" : "self"} ·
           Language: {lang === "es" ? "Spanish" : "English"}

@@ -54,11 +54,14 @@ export default function Home() {
         <span>{t.homePrivacy}</span>
       </p>
 
-      <p>
-        <Link href="/pose" className="dev-link">
-          {t.devLink}
-        </Link>
-      </p>
+      {/* The pose debug page is for the team; families never see this link. */}
+      {process.env.NODE_ENV !== "production" && (
+        <p>
+          <Link href="/pose" className="dev-link">
+            {t.devLink}
+          </Link>
+        </p>
+      )}
     </AppShell>
   );
 }

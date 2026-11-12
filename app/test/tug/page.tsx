@@ -36,6 +36,7 @@ export default function TugPage() {
         router.push("/test/chair");
       }}
       onNext={() => router.push("/test/chair")}
+      onBack={() => router.push("/setup")}
     />
   );
 }

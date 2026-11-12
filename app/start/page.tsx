@@ -9,6 +9,7 @@ import { ChoiceGroup, Field } from "@/components/Form";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
+  loadSession,
   saveSession,
   screenedAtRisk,
   STEADI_MIN_AGE,
@@ -70,6 +71,24 @@ export default function Start() {
     setLang(l);
     setHeightUnit(l === "es" ? "metric" : "imperial");
     setCanSpeak(typeof window !== "undefined" && "speechSynthesis" in window);
+    // Back from Setup: reopen the summary with the saved answers instead of a blank form.
+    const prev = new URLSearchParams(window.location.search).get("resume") ? loadSession() : null;
+    if (prev) {
+      setLang(prev.lang);
+      setRunner(prev.runner);
+      setFirstName(prev.profile.firstName);
+      setAgeText(String(prev.profile.age));
+      setSex(prev.profile.sex);
+      setAid(prev.profile.walkingAid);
+      setHeightUnit("metric");
+      setCmText(String(prev.profile.heightCm));
+      setUnsteady(prev.screening.unsteady);
+      setWorry(prev.screening.worry);
+      setFallen(prev.screening.fallen);
+      setFallCount(prev.screening.fallCount);
+      setInjured(prev.screening.injured);
+      setStep("summary");
+    }
   }, []);
   // New screen: start at the top, and hide errors until the person tries to continue.
   useEffect(() => {

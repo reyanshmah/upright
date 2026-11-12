@@ -294,6 +294,16 @@ const en = {
   } as Record<string, string>,
   textSample: "Sit all the way back in the chair.",
 
+  // Camera problems, in plain words
+  camErrDenied: "The camera is blocked. Allow camera access for this site in the browser settings, then tap the button again.",
+  camErrNotFound: "No camera was found on this phone.",
+  camErrInUse: "Another app is using the camera. Close it, then try again.",
+  camErrInsecure: "The camera only works on a secure (https://) address.",
+  // Family plan from the report service
+  reportWriting: "Writing a plan for these results…",
+  reportOffline: "You're offline, so this is the standard plan.",
+  reportAi: "This plan was written for these results by AI, then checked against the numbers.",
+
   // Setup diagram
   diaAltTug: "Top view: the chair against a wall, a walking route 3 m out to a tape mark and back, and the phone on a stand 2 to 3 m to the side, with its camera view covering both the chair and the mark",
   diaAltChair: "Top view and side view: the chair against a wall with a 17 inch seat, the person seated with arms crossed, and the phone on a stand 1 to 2 m to the side at hip height",
@@ -646,6 +656,14 @@ const es: Strings = {
     "low-glare": "Poco brillo (cálido, oscuro)",
   },
   textSample: "Siéntese bien atrás en la silla.",
+
+  camErrDenied: "La cámara está bloqueada. Permita el acceso a la cámara para este sitio en los ajustes del navegador y vuelva a tocar el botón.",
+  camErrNotFound: "No se encontró una cámara en este teléfono.",
+  camErrInUse: "Otra aplicación está usando la cámara. Ciérrela e inténtelo de nuevo.",
+  camErrInsecure: "La cámara solo funciona en una dirección segura (https://).",
+  reportWriting: "Preparando un plan para estos resultados…",
+  reportOffline: "No hay conexión, así que este es el plan estándar.",
+  reportAi: "Este plan se escribió para estos resultados con IA y se revisó con los números.",
 
   diaAltTug: "Vista desde arriba: la silla contra la pared, un recorrido de 3 m hasta una marca de cinta y de regreso, y el teléfono en un soporte a 2 o 3 m de lado, con la vista de la cámara cubriendo la silla y la marca",
   diaAltChair: "Vista desde arriba y de lado: la silla contra la pared con asiento de 43 cm, la persona sentada con los brazos cruzados y el teléfono en un soporte a 1 o 2 m de lado, a la altura de la cadera",

@@ -18,6 +18,15 @@ import { SetupDiagram } from "./Diagram";
 import { StatusBadge } from "./StatusBadge";
 import { TugResultCard } from "./TugResultCard";
 
+/** A camera error in plain words (the hook keeps the browser's error name, e.g. NotAllowedError). */
+export function cameraErrorText(raw: string, t: Strings): string {
+  if (/InsecureContext/.test(raw)) return t.camErrInsecure;
+  if (/NotAllowedError|PermissionDenied|SecurityError|Permission denied/i.test(raw)) return t.camErrDenied;
+  if (/NotFoundError|OverconstrainedError|DevicesNotFound/.test(raw)) return t.camErrNotFound;
+  if (/NotReadableError|TrackStartError|AbortError/.test(raw)) return t.camErrInUse;
+  return `${t.cameraError} ${raw}`;
+}
+
 export type TestKind = "tug" | "chair";
 export type TestPhase = "intro" | "position" | "instructions" | "countdown" | "running" | "aborted" | "failed" | "done";
 
@@ -88,6 +97,8 @@ export interface TestScreenProps {
     redo: () => void;
     next: () => void;
     download: () => void;
+    /** Leave the test from its intro (to the previous screen). */
+    back?: () => void;
   };
 }
 
@@ -111,9 +122,11 @@ export function TestScreen(p: TestScreenProps) {
   let pinned: ReactNode = null;
   if (phase === "intro") {
     pinned = (
-      <button type="button" className="btn btn--primary" onClick={p.on.check}>
-        {t.checkPosition}
-      </button>
+      <PinnedRow back={p.on.back} backLabel={t.back}>
+        <button type="button" className="btn btn--primary" onClick={p.on.check}>
+          {t.checkPosition}
+        </button>
+      </PinnedRow>
     );
   } else if (phase === "position") {
     pinned = (
@@ -180,11 +193,7 @@ export function TestScreen(p: TestScreenProps) {
       {showCam ? (
         <>
           {p.camLoading ? <p className="muted">{t.loadingCamera}</p> : null}
-          {p.camError ? (
-            <StatusBadge kind="risk">
-              {t.cameraError} {p.camError}
-            </StatusBadge>
-          ) : null}
+          {p.camError ? <StatusBadge kind="risk">{cameraErrorText(p.camError, t)}</StatusBadge> : null}
           {p.stage}
         </>
       ) : null}

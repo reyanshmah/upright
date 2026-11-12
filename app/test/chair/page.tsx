@@ -71,6 +71,7 @@ export default function ChairPage() {
         router.push("/test/balance");
       }}
       onNext={() => router.push("/test/balance")}
+      onBack={() => router.push("/test/tug")}
     />
   );
 }

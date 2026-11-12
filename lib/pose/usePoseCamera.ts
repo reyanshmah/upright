@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { keepScreenOn } from "../wakeLock";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { createPoseLandmarker, SKELETON_EDGES, type ModelVariant } from "./landmarker";
 import { missingParts, type BodyPart } from "../signal/geometry";
@@ -124,6 +125,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     rafRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    keepScreenOn(false);
     setStatus((s) => (s === "error" ? s : "idle"));
   }, []);
 
@@ -217,7 +219,11 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     async (facing: Facing = "environment", variant: ModelVariant = "full", deviceId?: string | null) => {
       setError(null);
       try {
-        if (!window.isSecureContext) throw new Error("The camera needs an https:// address.");
+        if (!window.isSecureContext) {
+          const err = new Error("The camera needs an https:// address.");
+          err.name = "InsecureContext";
+          throw err;
+        }
         setStatus("loading");
         if (!landmarkerRef.current) landmarkerRef.current = await createPoseLandmarker(variant);
         streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -262,9 +268,11 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
         video.srcObject = stream;
         await video.play();
         setStatus("running");
+        keepScreenOn(true);
         if (rafRef.current === null) rafRef.current = requestAnimationFrame(loop);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        // Keep the error's name (NotAllowedError, NotFoundError...) so the screen can explain it.
+        setError(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
         setStatus("error");
         stop();
       }

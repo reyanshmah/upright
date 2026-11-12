@@ -76,6 +76,8 @@ export interface SessionState {
   tug?: TugEntry | { skipped: true; reason: string };
   chair?: ChairEntry | { skipped: true; reason: string };
   balance?: BalanceResult | { skipped: true; reason: string };
+  /** Which path wrote the family plan text (MASTER.md report pipeline, step 8). "local" = offline/failed, on-device template. */
+  reportSource?: "model" | "regenerated" | "template" | "local";
   createdAt: string;
 }
 

@@ -1,4 +1,4 @@
-import { resolveDefaultTheme, THEME_IDS, THEME_STORAGE_KEY, type ThemeId } from "./themes";
+import { resolveDefaultTheme, THEMES, THEME_IDS, THEME_STORAGE_KEY, type ThemeId } from "./themes";
 
 /** "auto" = follow the phone's dark-mode and more-contrast settings (nothing saved). */
 export type ThemePref = ThemeId | "auto";
@@ -30,5 +30,15 @@ export function setThemePref(v: ThemePref): void {
   } catch {
     /* storage blocked: applies to this page only */
   }
-  document.documentElement.setAttribute("data-theme", v === "auto" ? systemTheme() : v);
+  const id = v === "auto" ? systemTheme() : v;
+  document.documentElement.setAttribute("data-theme", id);
+  syncBrowserBar(id);
+}
+
+/** The browser's address-bar color follows the chosen theme. */
+export function syncBrowserBar(id: ThemeId): void {
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    m.setAttribute("content", THEMES[id].bg);
+    m.removeAttribute("media");
+  });
 }

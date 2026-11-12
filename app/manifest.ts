@@ -9,7 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    orientation: "portrait",
+    // Not locked: the TUG and chair stand film with the phone on its side.
+    orientation: "any",
     background_color: THEMES["clinic-light"].bg,
     theme_color: THEMES["clinic-light"].bg,
     icons: [
