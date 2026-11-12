@@ -412,6 +412,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
 .stage { position: relative; width: 100%; background: #000; border-radius: var(--radius); overflow: hidden; flex: none; }
 .stage video, .stage canvas { width: 100%; height: auto; display: block; }
 .stage canvas { position: absolute; inset: 0; height: 100%; }
+.stage--mirror video, .stage--mirror canvas { transform: scaleX(-1); }
 .stage-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .big-readout { font-size: clamp(3rem, 14vw, 6rem); font-weight: 800; color: #fff; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7); }
 

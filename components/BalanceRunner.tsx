@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { STRINGS, type Lang } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
+import { CameraControls } from "@/components/CameraControls";
 import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
@@ -297,7 +298,7 @@ export function BalanceRunner({
         <>
           {cam.status === "loading" ? <p className="muted">{t.loadingCamera}</p> : null}
           {cam.error ? <StatusBadge kind="risk">{cameraErrorText(cam.error, t)}</StatusBadge> : null}
-          <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} overlay={null} />
+          <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} mirror={cam.facing === "user"} overlay={null} />
         </>
       ) : null}
 
@@ -325,14 +326,7 @@ export function BalanceRunner({
 
       {phase === "position" && (
         <>
-          {cam.camera && (
-            <p className="camline">
-              {cam.camera.wide ? t.camWide : t.camNormal}{" "}
-              <button type="button" className="linkish" onClick={() => { fx.current = null; void cam.switchCamera(); }}>
-                {t.camSwitch}
-              </button>
-            </p>
-          )}
+          {cam.camera && <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} />}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {rows.map((r) => (
               <li key={r.id}>

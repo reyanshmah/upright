@@ -5,6 +5,7 @@ import type { Lang } from "@/lib/i18n";
 import { STRINGS } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
+import { CameraControls } from "@/components/CameraControls";
 import {
   cmToFtIn,
   distanceM,
@@ -174,6 +175,7 @@ export function PoseMeasure({
       <CameraStage
         videoRef={cam.videoRef}
         canvasRef={cam.canvasRef}
+        mirror={cam.facing === "user"}
         overlay={
           stage === "walk" && dist !== null ? (
             <p className={`ar-dist ${atTarget ? "ok" : tooFar ? "bad" : ""}`} style={{ color: atTarget ? undefined : "#fff", textShadow: "0 1px 6px #000" }}>
@@ -182,6 +184,8 @@ export function PoseMeasure({
           ) : null
         }
       />
+
+      {stage !== "idle" && cam.camera && <CameraControls cam={cam} lang={lang} />}
 
       <div className="pinned__row">
         {stage === "idle" && (

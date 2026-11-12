@@ -5,6 +5,7 @@ import { STRINGS, type Lang } from "@/lib/i18n";
 import { gateRows, TestScreen, type TestPhase } from "@/components/TestScreens";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
+import { CameraControls } from "@/components/CameraControls";
 import { getLastCueSource, playCue, playCueAndWait, unlockAudio } from "@/lib/voice";
 import { buildChairResult, buildTugResult, tugMarkVisible, type RunContext } from "@/lib/analysis";
 import { FeatureExtractor } from "@/lib/analysis/features";
@@ -327,20 +328,14 @@ export function TestRunner({
         <CameraStage
           videoRef={cam.videoRef}
           canvasRef={cam.canvasRef}
+          mirror={cam.facing === "user"}
           overlay={phase === "countdown" ? <div className="big-readout" aria-hidden>{countdown}</div> : null}
         />
       }
       camLoading={cam.status === "loading"}
       camError={cam.error}
       camLine={
-        cam.camera ? (
-          <p className="camline">
-            {cam.camera.wide ? t.camWide : t.camNormal}{" "}
-            <button type="button" className="linkish" onClick={() => { fx.current = null; void cam.switchCamera(); }}>
-              {t.camSwitch}
-            </button>
-          </p>
-        ) : null
+        cam.camera ? <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} /> : null
       }
       rows={rows}
       allOk={rows.every((r) => r.ok)}

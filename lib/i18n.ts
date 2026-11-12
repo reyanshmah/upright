@@ -164,6 +164,9 @@ const en = {
   camWide: "Using the wide (0.5×) camera",
   camNormal: "Using the normal camera. If everything doesn't fit, try another camera.",
   camSwitch: "Try another camera",
+  camFront: "Using the front camera, shown like a mirror (for testing on your own).",
+  camUseFront: "Use the front camera",
+  camUseBack: "Use the back camera",
 
   // TUG
   tugName: "Timed Up and Go",
@@ -528,6 +531,9 @@ const es: Strings = {
   camWide: "Usando la cámara gran angular (0.5×)",
   camNormal: "Usando la cámara normal. Si no cabe todo, pruebe otra cámara.",
   camSwitch: "Probar otra cámara",
+  camFront: "Usando la cámara frontal, como un espejo (para hacer la prueba usted solo/a).",
+  camUseFront: "Usar la cámara frontal",
+  camUseBack: "Usar la cámara trasera",
 
   tugName: "Levántate y Anda (TUG)",
   tugWhat: "Mide caminar, girar y levantarse. A paso normal, no es una carrera.",

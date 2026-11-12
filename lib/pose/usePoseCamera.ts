@@ -119,6 +119,8 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const [error, setError] = useState<string | null>(null);
   const [gates, setGates] = useState<Gates>(NO_GATES);
   const [camera, setCamera] = useState<ActiveCamera | null>(null);
+  const [facing, setFacing] = useState<Facing>("environment");
+  const facingRef = useRef<Facing>("environment");
 
   const stop = useCallback(() => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -264,6 +266,8 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
           wide: (zoom !== null && zoom < 1) || WIDE_LABEL.test(track.label),
         });
         streamRef.current = stream;
+        facingRef.current = facing;
+        setFacing(facing);
         const video = videoRef.current!;
         video.srcObject = stream;
         await video.play();
@@ -291,6 +295,11 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     return true;
   }, [start]);
 
+  /** Toggle between the back camera and the front (selfie) camera, for solo testing. */
+  const flipCamera = useCallback(async () => {
+    await start(facingRef.current === "environment" ? "user" : "environment", "full");
+  }, [start]);
+
   const startRecording = useCallback(() => {
     recording.current = [];
     fpsLog.current = [];
@@ -316,6 +325,8 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     error,
     gates,
     camera,
+    facing,
+    flipCamera,
     start,
     stop,
     switchCamera,
