@@ -97,10 +97,6 @@ export function SettingsSheet({
           ))}
         </Group>
 
-        <p className="sheet__sample" aria-hidden>
-          {t.textSample}
-        </p>
-
         <Group legend={t.themeLabel}>
           {(["auto", ...THEME_ORDER] as ThemePref[]).map((v) => (
             <Option

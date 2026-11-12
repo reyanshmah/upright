@@ -357,7 +357,6 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
 .opt__theme { display: flex; align-items: center; gap: var(--sp-3); }
 .swatch { flex: none; width: 44px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 2px solid; border-radius: 6px; }
 .swatch span { width: 11px; height: 11px; border-radius: 50%; }
-.sheet__sample { margin-top: var(--sp-2) !important; padding: var(--sp-4); background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); font-size: var(--fs-lead); }
 
 /* ---------- Status and results ---------- */
 

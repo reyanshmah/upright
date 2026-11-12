@@ -292,7 +292,6 @@ const en = {
     "cvd-safe": "Color-blind friendly",
     "low-glare": "Low glare (warm, dark)",
   } as Record<string, string>,
-  textSample: "Sit all the way back in the chair.",
 
   // Camera problems, in plain words
   camErrDenied: "The camera is blocked. Allow camera access for this site in the browser settings, then tap the button again.",
@@ -655,7 +654,6 @@ const es: Strings = {
     "cvd-safe": "Para daltonismo",
     "low-glare": "Poco brillo (cálido, oscuro)",
   },
-  textSample: "Siéntese bien atrás en la silla.",
 
   camErrDenied: "La cámara está bloqueada. Permita el acceso a la cámara para este sitio en los ajustes del navegador y vuelva a tocar el botón.",
   camErrNotFound: "No se encontró una cámara en este teléfono.",
