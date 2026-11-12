@@ -38,7 +38,6 @@ const TXT = {
     done: "It's marked",
     exit: "Exit",
     approx: "This is a camera estimate, approximate within about 10–15 cm. A tape measure is more exact if you have one.",
-    back: "←",
   },
   es: {
     needHeight: "Falta la estatura. Regrese al perfil y agréguela, o use una cinta métrica.",
@@ -53,7 +52,6 @@ const TXT = {
     done: "Ya lo marqué",
     exit: "Salir",
     approx: "Esta es una estimación con cámara, aproximada, de unos 10–15 cm. Una cinta métrica es más exacta si la tiene.",
-    back: "←",
   },
 };
 
@@ -156,8 +154,8 @@ export function PoseMeasure({
         <div className="card card--risk">
           <p>{t.needHeight}</p>
         </div>
-        <div className="row">
-          <button className="btn btn--secondary" onClick={onBack}>{t.back}</button>
+        <div className="pinned__row">
+          <button className="btn btn--secondary" onClick={onBack}>{common.back}</button>
         </div>
       </section>
     );
@@ -185,25 +183,25 @@ export function PoseMeasure({
         }
       />
 
-      <div className="row" style={{ flexWrap: "nowrap" }}>
+      <div className="pinned__row">
         {stage === "idle" && (
           <>
-            <button className="btn btn--secondary" style={{ flex: "0 0 auto" }} onClick={onBack}>{t.back}</button>
-            <button className="btn btn--primary" style={{ flex: 1 }} onClick={begin}>{t.start}</button>
+            <button className="btn btn--secondary" onClick={onBack}>{common.back}</button>
+            <button className="btn btn--primary" onClick={begin}>{t.start}</button>
           </>
         )}
         {stage === "stand" && (
           <>
-            <button className="btn btn--secondary" style={{ flex: 1 }} onClick={stopCamera}>{t.exit}</button>
-            <button className="btn btn--primary" style={{ flex: 1 }} disabled={!ready} onClick={setStart}>{t.setStart}</button>
+            <button className="btn btn--secondary" onClick={stopCamera}>{t.exit}</button>
+            <button className="btn btn--primary" disabled={!ready} onClick={setStart}>{t.setStart}</button>
           </>
         )}
         {stage === "walk" && (
           <>
-            <button className="btn btn--secondary" style={{ flex: 1 }} onClick={redo}>{t.redo}</button>
+            <button className="btn btn--secondary" onClick={redo}>{t.redo}</button>
             <button
               className="btn btn--primary"
-              style={{ flex: 1 }}
+             
               disabled={!atTarget}
               onClick={() => {
                 const d = dist!;

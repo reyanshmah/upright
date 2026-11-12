@@ -2,7 +2,7 @@
 
 /// <reference types="webxr" />
 import { useEffect, useRef, useState } from "react";
-import type { Lang } from "@/lib/i18n";
+import { STRINGS, type Lang } from "@/lib/i18n";
 import { cmToFtIn } from "@/lib/measure";
 
 /**
@@ -77,6 +77,7 @@ export function ARMeasure({
   onFallback: () => void;
 }) {
   const t = TXT[lang];
+  const back = STRINGS[lang].back;
   const overlayRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<XRSession | null>(null);
   const curPoint = useRef<DOMPointReadOnly | null>(null);
@@ -195,9 +196,9 @@ export function ARMeasure({
   const tooFar = dist !== null && dist > TARGET_M + TOL_M;
 
   return (
-    <section>
+    <section className="stack">
       {ar === "unsupported" && (
-        <div className="card card--risk">
+        <div className="card card--risk stack">
           <p className="big">{t.unsupportedTitle}</p>
           <p>{t.unsupportedBody}</p>
           <button type="button" className="btn btn--secondary" onClick={onFallback}>{t.useEstimate}</button>
@@ -213,9 +214,9 @@ export function ARMeasure({
           )}
         </>
       )}
-      <div className="row nav">
-        <button className="btn btn--secondary" onClick={onBack}>←</button>
-      </div>
+      {ar !== "running" && (
+        <button className="btn btn--secondary" onClick={onBack}>{back}</button>
+      )}
 
       {/* DOM overlay shown on top of the AR camera view */}
       <div ref={overlayRef} className={`ar-overlay ${ar === "running" ? "on" : ""}`}>
