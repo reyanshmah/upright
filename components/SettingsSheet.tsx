@@ -7,7 +7,7 @@ import { getThemePref, setThemePref, type ThemePref } from "../lib/themePref";
 import { THEMES, type ThemeId } from "../lib/themes";
 
 /** Light and dark versions next to each other. */
-const THEME_ORDER: ThemeId[] = ["clinic-light", "clinic-dark", "signal-light", "signal-dark", "cvd-safe", "low-glare"];
+const THEME_ORDER: ThemeId[] = ["clinic-light", "clinic-dark", "signal-light", "signal-dark", "low-glare"];
 
 /**
  * Settings in one place: language, text size, font, colors. Every change

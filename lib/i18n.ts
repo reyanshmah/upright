@@ -289,7 +289,6 @@ const en = {
     "clinic-dark": "Dark",
     "signal-light": "High contrast, light",
     "signal-dark": "High contrast, dark",
-    "cvd-safe": "Color-blind friendly",
     "low-glare": "Low glare (warm, dark)",
   } as Record<string, string>,
 
@@ -651,7 +650,6 @@ const es: Strings = {
     "clinic-dark": "Oscuro",
     "signal-light": "Alto contraste, claro",
     "signal-dark": "Alto contraste, oscuro",
-    "cvd-safe": "Para daltonismo",
     "low-glare": "Poco brillo (cálido, oscuro)",
   },
 

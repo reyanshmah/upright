@@ -3,7 +3,6 @@ export type ThemeId =
   | "clinic-dark"
   | "signal-dark"
   | "signal-light"
-  | "cvd-safe"
   | "low-glare";
 
 export interface StatusColors {
@@ -41,7 +40,7 @@ export interface Theme {
 /*
  * Agreed palettes: clinic-light, signal-light, signal-dark.
  * PROPOSED (not yet agreed; values must not be changed without sign-off):
- * clinic-dark, cvd-safe, low-glare.
+ *    clinic-dark, low-glare.
  * tests/contrast.test.ts checks every pair and that styles/tokens.css matches.
  */
 export const THEMES: Record<ThemeId, Theme> = {
@@ -145,32 +144,6 @@ export const THEMES: Record<ThemeId, Theme> = {
     risk: { bg: "#FFFFFF", fg: "#000000", bd: "#B00020" },
     total: { bg: "#FFFFFF", fg: "#000000", bd: "#8A5A00" },
     none: { bg: "#FFFFFF", fg: "#000000", bd: "#333333" },
-  },
-  // PROPOSED palette, not yet agreed.
-  "cvd-safe": {
-    id: "cvd-safe",
-    name: "Color-blind safe",
-    scheme: "light",
-    family: "clinic",
-    bg: "#F5F7F8",
-    card: "#FFFFFF",
-    ink: "#111827",
-    ink2: "#374151",
-    line: "#CBD2D9",
-    act: "#0B5CAD",
-    onAct: "#FFFFFF",
-    actBd: "none",
-    ring: "#0B5CAD",
-    stop: "#8A1C1C",
-    stopFg: "#FFFFFF",
-    stopBd: "none",
-    slate: "#374151",
-    slateFg: "#FFFFFF",
-    slateBd: "none",
-    ok: { bg: "#E3EEFA", fg: "#0B4F94", bd: "#0B4F94" },
-    risk: { bg: "#FDEBDD", fg: "#8F3600", bd: "#8F3600" },
-    total: { bg: "#FFF3BF", fg: "#5C4500", bd: "#5C4500" },
-    none: { bg: "#E5E7EB", fg: "#374151", bd: "#374151" },
   },
   // PROPOSED palette, not yet agreed.
   "low-glare": {

@@ -1,5 +1,5 @@
 /* Generated from the palette source; tests/contrast.test.ts fails if this file and lib/themes.ts drift apart.
-   Agreed: clinic-light, signal-dark, signal-light. PROPOSED (not yet agreed): clinic-dark, cvd-safe, low-glare. */
+   Agreed: clinic-light, signal-dark, signal-light. PROPOSED (not yet agreed): clinic-dark, low-glare. */
 :root {
   --fs-label: 1rem;
   --fs-body: 1.125rem;
@@ -171,46 +171,6 @@
   --w-head: 800;
   --w-num: 800;
   --w-body: 500;
-}
-
-/* PROPOSED palette, not yet agreed. */
-[data-theme="cvd-safe"] {
-  color-scheme: light;
-  --bg: #F5F7F8;
-  --card: #FFFFFF;
-  --ink: #111827;
-  --ink-2: #374151;
-  --line: #CBD2D9;
-  --act: #0B5CAD;
-  --on-act: #FFFFFF;
-  --act-bd: none;
-  --ring: #0B5CAD;
-  --stop: #8A1C1C;
-  --stop-fg: #FFFFFF;
-  --stop-bd: none;
-  --slate: #374151;
-  --slate-fg: #FFFFFF;
-  --slate-bd: none;
-  --ok-bg: #E3EEFA;
-  --ok-fg: #0B4F94;
-  --ok-bd: #0B4F94;
-  --risk-bg: #FDEBDD;
-  --risk-fg: #8F3600;
-  --risk-bd: #8F3600;
-  --total-bg: #FFF3BF;
-  --total-fg: #5C4500;
-  --total-bd: #5C4500;
-  --none-bg: #E5E7EB;
-  --none-fg: #374151;
-  --none-bd: #374151;
-  --font-head: var(--font-atkinson), 'Atkinson Hyperlegible', Arial, sans-serif;
-  --font-body: var(--font-atkinson), 'Atkinson Hyperlegible', Arial, sans-serif;
-  --radius: 10px;
-  --status-bw: 1.5px;
-  --card-bw: 1px;
-  --w-head: 700;
-  --w-num: 700;
-  --w-body: 400;
 }
 
 /* PROPOSED palette, not yet agreed. */
