@@ -62,7 +62,7 @@ export interface BalanceResult {
 export interface SetupInfo {
   safetyConfirmed: boolean;
   /** How the 3 m line was laid out. */
-  lineMethod: "ar" | "tape" | null;
+  lineMethod: "ar" | "tape" | "pose" | null;
   /** Distance AR measured when the helper marked the line (meters). */
   cameraMeasuredM: number | null;
 }

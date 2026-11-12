@@ -10,8 +10,9 @@ import { loadSession, updateSession, type SessionState } from "@/lib/session";
 import { setLangPref } from "@/lib/langPref";
 import { SetupDiagram } from "@/components/Diagram";
 import { ARMeasure } from "@/components/ARMeasure";
+import { PoseMeasure } from "@/components/PoseMeasure";
 
-type Step = "safety" | "method" | "tape" | "ar";
+type Step = "safety" | "method" | "tape" | "ar" | "pose";
 
 /** Safety checklist and the 3 m line. (The camera gate check is the first screen of each test.) */
 export default function Setup() {
@@ -39,7 +40,7 @@ export default function Setup() {
     setSession({ ...session, lang: l });
   };
 
-  const finish = (method: "ar" | "tape", measured: number | null) => {
+  const finish = (method: "ar" | "tape" | "pose", measured: number | null) => {
     updateSession({ setup: { safetyConfirmed: true, lineMethod: method, cameraMeasuredM: measured } });
     router.push("/test/tug");
   };
@@ -133,7 +134,24 @@ export default function Setup() {
       {step === "ar" && (
         <>
           <h1 className="h1">{t.measureTitle}</h1>
-          <ARMeasure lang={lang} onBack={() => setStep("method")} onDone={(m) => finish("ar", m)} />
+          <ARMeasure
+            lang={lang}
+            onBack={() => setStep("method")}
+            onDone={(m) => finish("ar", m)}
+            onFallback={() => setStep("pose")}
+          />
+        </>
+      )}
+
+      {step === "pose" && (
+        <>
+          <h1 className="h1">{t.measureTitle}</h1>
+          <PoseMeasure
+            lang={lang}
+            heightCm={session.profile.heightCm}
+            onBack={() => setStep("ar")}
+            onDone={(m) => finish("pose", m)}
+          />
         </>
       )}
     </AppShell>
