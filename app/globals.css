@@ -465,6 +465,7 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
 .ar-dist.ok { color: #ffd23f; }
 .ar-dist.bad { color: #ffb4a8; }
 .ar-bottom { position: absolute; bottom: 0; left: 0; right: 0; padding: var(--sp-4); padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom)); display: flex; gap: var(--sp-3); justify-content: space-between; align-items: stretch; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.7)); }
+.ar-bottom > .btn { flex: 1 1 0; min-width: 0; }
 
 @media print {
   html, body { background: #fff; color: #000; font-size: 12px; }
