@@ -281,7 +281,7 @@ export function ResultsView({
                 Measurement quality — TUG: {tug ? (tug.outcome === "full" ? "full" : "total time only") : tugRefused ? "could not measure" : "—"}
                 {tug ? ` (timing ±${tug.timingErrorSec.toFixed(2)} s)` : ""}, chair stand: {chair ? "full" : chairRefused ? "could not measure" : "—"} ·
                 Median fps: {tug?.medianFps ? tug.medianFps.toFixed(0) : "—"} / {chair?.medianFps ? chair.medianFps.toFixed(0) : "—"} ·
-                3 m line: {s.setup?.lineMethod === "ar" ? `phone AR (ARCore), ${s.setup.cameraMeasuredM?.toFixed(2)} m` : s.setup?.lineMethod === "tape" ? "tape measure" : "—"} ·
+                3 m line: {s.setup?.lineMethod === "ar" ? `phone AR (ARCore), ${s.setup.cameraMeasuredM?.toFixed(2)} m` : s.setup?.lineMethod === "pose" ? `camera estimate (pose, approximate), ${s.setup.cameraMeasuredM?.toFixed(2)} m` : s.setup?.lineMethod === "tape" ? "tape measure" : "—"} ·
                 Camera: {[tug?.camera, chair?.camera, bal?.camera].filter(Boolean).map((c) => `${c!.wide ? "wide " : ""}${c!.zoom ? `${c!.zoom}× ` : ""}${c!.label || "back camera"}`).filter((v, i, a) => a.indexOf(v) === i).join("; ") || "—"}
               </td>
             </tr>

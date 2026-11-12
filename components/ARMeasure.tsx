@@ -40,6 +40,7 @@ const TXT = {
     exit: "Exit",
     noFloor: "Looking for the floor…",
     error: "AR could not start:",
+    useEstimate: "Estimate with the camera instead (approximate)",
   },
   es: {
     unsupportedTitle: "La medición con realidad aumentada no está disponible en este teléfono/navegador",
@@ -59,6 +60,7 @@ const TXT = {
     exit: "Salir",
     noFloor: "Buscando el piso…",
     error: "No se pudo iniciar la RA:",
+    useEstimate: "Estimar con la cámara en su lugar (aproximado)",
   },
 };
 
@@ -66,10 +68,13 @@ export function ARMeasure({
   lang,
   onDone,
   onBack,
+  onFallback,
 }: {
   lang: Lang;
   onDone: (measuredM: number) => void;
   onBack: () => void;
+  /** Offered whenever AR can't run: switches to the camera pose estimate. */
+  onFallback: () => void;
 }) {
   const t = TXT[lang];
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -195,6 +200,7 @@ export function ARMeasure({
         <div className="card card--risk">
           <p className="big">{t.unsupportedTitle}</p>
           <p>{t.unsupportedBody}</p>
+          <button type="button" className="btn btn--secondary" onClick={onFallback}>{t.useEstimate}</button>
         </div>
       )}
       {(ar === "ready" || ar === "error" || ar === "checking") && (
@@ -202,6 +208,9 @@ export function ARMeasure({
           <p>{t.intro}</p>
           {err && <p className="note bad">{t.error} {err}</p>}
           <button className="btn btn--primary" disabled={ar === "checking"} onClick={begin}>{t.start}</button>
+          {ar === "error" && (
+            <button type="button" className="btn btn--secondary" onClick={onFallback}>{t.useEstimate}</button>
+          )}
         </>
       )}
       <div className="row nav">
