@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { STRINGS, type Lang } from "@/lib/i18n";
 import { NeedStart } from "@/components/NeedStart";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PinnedRow } from "@/components/AppShell";
+import { Icon } from "@/components/Icon";
 import { loadSession, updateSession, type SessionState } from "@/lib/session";
 import { setLangPref } from "@/lib/langPref";
 import { SetupDiagram } from "@/components/Diagram";
@@ -45,21 +46,36 @@ export default function Setup() {
 
   const pinned =
     step === "safety" ? (
-      <button type="button" className="btn btn--primary" disabled={!allChecked} onClick={() => setStep("method")}>
-        {t.next}
-      </button>
+      <PinnedRow back={() => router.push("/start")} backLabel={t.back}>
+        <button
+          type="button"
+          className={`btn ${allChecked ? "btn--primary" : "btn--notready"}`}
+          aria-disabled={!allChecked}
+          onClick={() => (allChecked ? setStep("method") : document.querySelector(".checklist input:not(:checked)")?.closest("label")?.focus())}
+        >
+          {t.next}
+        </button>
+      </PinnedRow>
+    ) : step === "method" ? (
+      <PinnedRow back={() => setStep("safety")} backLabel={t.back}>
+        {null}
+      </PinnedRow>
     ) : step === "tape" ? (
-      <button type="button" className="btn btn--primary" onClick={() => finish("tape", null)}>
-        {t.tapeDone}
-      </button>
+      <PinnedRow back={() => setStep("method")} backLabel={t.back}>
+        <button type="button" className="btn btn--primary" onClick={() => finish("tape", null)}>
+          {t.tapeDone}
+        </button>
+      </PinnedRow>
     ) : null;
 
   return (
     <AppShell lang={lang} onLang={onLang} pinned={pinned}>
       {step === "safety" && (
         <>
-          <h1 className="h1">{t.safetyTitle}</h1>
-          <p className="muted">{t.safetySub}</p>
+          <div className="stack-sm">
+            <h1 className="h1">{t.safetyTitle}</h1>
+            <p className="lead">{t.safetySub}</p>
+          </div>
           <ul className="checklist">
             {items.map((text, i) => (
               <li key={i}>
@@ -69,45 +85,48 @@ export default function Setup() {
                     checked={checks[i]}
                     onChange={(e) => setChecks((c) => c.map((v, j) => (j === i ? e.target.checked : v)))}
                   />
+                  <span className="checklist__box" aria-hidden>
+                    <Icon name="check" size={22} />
+                  </span>
                   <span>{text}</span>
                 </label>
               </li>
             ))}
           </ul>
-          {!allChecked && <p className="muted">{t.safetyAll}</p>}
-          <button type="button" className="btn btn--secondary" onClick={() => router.push("/start")}>
-            {t.back}
-          </button>
+          <p className="footnote" aria-live="polite">
+            <Icon name={allChecked ? "check" : "info"} size={20} />
+            <span>{allChecked ? t.allChecked : `${t.safetyAll} (${checks.filter(Boolean).length}/5)`}</span>
+          </p>
         </>
       )}
 
       {step === "method" && (
         <>
-          <h1 className="h1">{t.measureTitle}</h1>
-          <p>{t.measureSub}</p>
-          <SetupDiagram kind="measure" />
-          <div className="choices">
-            <button type="button" className="choice" onClick={() => setStep("ar")}>
-              {t.measureCamera}
+          <div className="stack-sm">
+            <h1 className="h1">{t.measureTitle}</h1>
+            <p className="lead">{t.measureSub}</p>
+          </div>
+          <SetupDiagram kind="measure" lang={lang} />
+          <div className="action-list">
+            <button type="button" className="action-card" onClick={() => setStep("tape")}>
+              <span>{t.measureTape}</span>
+              <Icon name="back" className="icon--flip" />
             </button>
-            <button type="button" className="choice" onClick={() => setStep("tape")}>
-              {t.measureTape}
+            <button type="button" className="action-card" onClick={() => setStep("ar")}>
+              <span>{t.measureCamera}</span>
+              <Icon name="back" className="icon--flip" />
             </button>
           </div>
-          <button type="button" className="btn btn--secondary" onClick={() => setStep("safety")}>
-            {t.back}
-          </button>
         </>
       )}
 
       {step === "tape" && (
         <>
-          <h1 className="h1">{t.tapeTitle}</h1>
-          <p>{t.tapeBody}</p>
-          <SetupDiagram kind="tug" />
-          <button type="button" className="btn btn--secondary" onClick={() => setStep("method")}>
-            {t.back}
-          </button>
+          <div className="stack-sm">
+            <h1 className="h1">{t.tapeTitle}</h1>
+            <p className="lead">{t.tapeBody}</p>
+          </div>
+          <SetupDiagram kind="tug" lang={lang} />
         </>
       )}
 

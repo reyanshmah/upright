@@ -2,13 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { Lang } from "@/lib/i18n";
-import { getLangPref, setLangPref } from "@/lib/langPref";
+import { STRINGS, type Lang } from "@/lib/i18n";
+import { detectLang, setLangPref } from "@/lib/langPref";
 import { AppShell } from "@/components/AppShell";
+import { Icon, type IconName } from "@/components/Icon";
+
+const NEED_ICONS: IconName[] = ["chair", "floor", "people"];
 
 export default function Home() {
   const [lang, setLang] = useState<Lang | null>(null);
-  useEffect(() => setLang(getLangPref()), []);
+  useEffect(() => setLang(detectLang()), []);
+  if (!lang) return null;
+  const t = STRINGS[lang];
   return (
     <AppShell
       lang={lang}
@@ -18,18 +23,41 @@ export default function Home() {
       }}
       pinned={
         <Link className="btn btn--primary" href="/start">
-          Start a screening · Empezar
+          {t.homeStart}
         </Link>
       }
     >
-      <h1 className="h1">Upright</h1>
-      <p lang="en">
-        A 10-minute home fall-risk screen using CDC STEADI tests: Timed Up and Go and the
-        30-Second Chair Stand. Your phone does the measuring. No video leaves the phone.
+      <section className="hero">
+        <img className="hero__logo" src="/icons/icon-192.png" width={88} height={88} alt="" />
+        <h1 className="h1">{t.homeTitle}</h1>
+        <p className="lead">{t.homeSub}</p>
+      </section>
+
+      <section className="stack-sm" aria-labelledby="need-title">
+        <h2 className="label" id="need-title">
+          {t.homeNeedTitle}
+        </h2>
+        <ul className="icon-list">
+          {t.homeNeed.map((item, i) => (
+            <li key={i}>
+              <span className="icon-list__icon">
+                <Icon name={NEED_ICONS[i] ?? "check"} />
+              </span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <p className="footnote">
+        <Icon name="lock" size={20} />
+        <span>{t.homePrivacy}</span>
       </p>
-      <p className="muted" lang="es">Una evaluación en casa del riesgo de caídas, en inglés o español.</p>
-      <p className="small">
-        <Link href="/pose" className="muted">Developer: camera check</Link>
+
+      <p>
+        <Link href="/pose" className="dev-link">
+          {t.devLink}
+        </Link>
       </p>
     </AppShell>
   );

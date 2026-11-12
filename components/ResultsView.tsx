@@ -214,7 +214,7 @@ export function ResultsView({
                   </>
                 ) : (
                   tugRefused
-                    ? `Could not be measured (${tugEntry?.refusalReason ?? "—"}); no time recorded`
+                    ? `Could not be measured (${(tugEntry?.refusalReason ?? "—").replace(/_/g, " ")}); no time recorded`
                     : `Not done (${s.tug && isSkipped(s.tug) ? s.tug.reason : "—"})`
                 )}
               </td>
@@ -230,7 +230,7 @@ export function ResultsView({
                   </>
                 ) : (
                   chairRefused
-                    ? `Could not be measured (${chairEntry?.refusalReason ?? "—"}); no score recorded`
+                    ? `Could not be measured (${(chairEntry?.refusalReason ?? "—").replace(/_/g, " ")}); no score recorded`
                     : `Not done (${s.chair && isSkipped(s.chair) ? s.chair.reason : "—"})`
                 )}
               </td>

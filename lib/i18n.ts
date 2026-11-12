@@ -6,6 +6,12 @@
  */
 export type Lang = "en" | "es";
 
+/** Languages offered in Settings, each named in its own language. Add new ones here. */
+export const LANGS: { code: Lang; nativeName: string }[] = [
+  { code: "en", nativeName: "English" },
+  { code: "es", nativeName: "Español" },
+];
+
 const en = {
   appName: "Upright",
   disclaimer: "Home screening aid, not a diagnosis; share results with your doctor.",
@@ -24,9 +30,9 @@ const en = {
   langSub: "Elija un idioma",
 
   whoTitle: "Who is using the phone?",
-  whoSelf: "I am testing myself",
-  whoHelper: "I am helping someone else",
-  whoHelperNote: "Great. You will set up the phone and stay beside them during the tests.",
+  whoSelf: "I'm testing myself",
+  whoHelper: "I'm helping someone else",
+  whoHelperNote: "You'll hold the phone, ask the questions, and stay beside them during the tests.",
   whoSelfNote: "You will need someone nearby during the walking and standing tests, for safety.",
 
   profileTitle: "About the person being tested",
@@ -35,7 +41,7 @@ const en = {
   nameLabel: "First name (optional)",
   namePlaceholder: "e.g. Asha",
   ageLabel: "Age",
-  sexLabel: "Sex (used only for the CDC comparison table)",
+  sexLabel: "Sex",
   female: "Female",
   male: "Male",
   heightLabel: "Height",
@@ -65,7 +71,7 @@ const en = {
 
   resultTitleRisk: "Screening: at risk for falling",
   resultBodyRisk:
-    "At least one answer was yes. The CDC recommends checking strength and balance next. The two tests take about 5 minutes.",
+    "At least one answer was yes. The CDC recommends checking strength and balance next. The three tests take about 10 minutes.",
   resultTitleBaseline: "Screening: no risk answers",
   resultBodyBaseline:
     "All answers were no. You can still do the tests to get a baseline to compare against next year.",
@@ -273,6 +279,77 @@ const en = {
   gateNotStanding: "Stand up, facing the phone",
 
 
+  // Settings sheet
+  settings: "Settings",
+  done: "Done",
+  themeLabel: "Colors",
+  themeAuto: "Automatic (match this phone)",
+  themeNames: {
+    "clinic-light": "Light",
+    "clinic-dark": "Dark",
+    "signal-light": "High contrast, light",
+    "signal-dark": "High contrast, dark",
+    "cvd-safe": "Color-blind friendly",
+    "low-glare": "Low glare (warm, dark)",
+  } as Record<string, string>,
+  textSample: "Sit all the way back in the chair.",
+
+  // Setup diagram
+  diaAltTug: "Top view: the chair against a wall, a walking route 3 m out to a tape mark and back, and the phone on a stand 2 to 3 m to the side, with its camera view covering both the chair and the mark",
+  diaAltChair: "Top view and side view: the chair against a wall with a 17 inch seat, the person seated with arms crossed, and the phone on a stand 1 to 2 m to the side at hip height",
+  diaAltMeasure: "Top view: a tape measure laid straight out 3 m from the front edge of the chair seat, with a tape mark at 3 m",
+  diaWall: "wall",
+  diaChair: "chair",
+  diaMark: "mark",
+  diaPhone: "phone at hip height",
+  diaPhoneShort: "phone",
+  diaView: "camera view",
+  diaSide: "side view",
+  diaSeat: "seat 17 in (43 cm)",
+  diaHip: "hip height",
+  diaTape: "tape measure",
+  allChecked: "All 5 checked",
+  summaryTitle: "Screening result",
+  summaryTitleNamed: (name: string) => `${name}'s screening`,
+  summaryRisk: "At risk for falling",
+  summaryOk: "No risk answers",
+
+  // Home
+  homeTitle: "Check fall risk at home",
+  homeSub: "Three short tests from the CDC, timed by your phone's camera. About 10 minutes.",
+  homeNeedTitle: "You'll need",
+  homeNeed: [
+    "A sturdy chair with no armrests",
+    "About 4 m (13 ft) of clear floor",
+    "Someone to stand beside you during the tests",
+  ],
+  homePrivacy: "Video never leaves this phone. Only the numbers are kept.",
+  homeStart: "Start",
+  devLink: "Developer: camera check",
+
+  // Onboarding (adapts to who is holding the phone)
+  stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
+  questionOf: (n: number) => `Question ${n} of 3`,
+  aboutTitleSelf: "About you",
+  aboutTitleHelper: "About the person you're helping",
+  aboutSub: "Used only to compare with the CDC tables. It stays on this phone.",
+  nameLabelSelf: "Your first name",
+  nameLabelHelper: "Their first name",
+  optional: "optional",
+  nameHint: "Shown on the results, so the family knows whose they are.",
+  ageLabelSelf: "Your age",
+  ageLabelHelper: "Their age",
+  years: "years",
+  sexHint: "Only used to pick the right CDC comparison table.",
+  bodyTitle: "Height and walking aid",
+  heightHint: "Used to measure the 3 m walking line with the camera.",
+  aidLabelSelf: "Do you usually use a walking aid?",
+  askName: (name: string) => `Ask ${name}:`,
+  askThem: "Ask them:",
+  helperAskNote: "Read the question out loud and tap their answer.",
+  readAloud: "Read aloud",
+  summaryNext: "Next: a quick safety check, then three short tests.",
+
   // App shell and screen copy (fixed wording, Nov 11 design spec)
   langGroup: "Language",
   displayTitle: "Text and font",
@@ -313,9 +390,9 @@ const es: Strings = {
   langSub: "Elija un idioma",
 
   whoTitle: "¿Quién está usando el teléfono?",
-  whoSelf: "Me estoy evaluando a mí mismo/a",
+  whoSelf: "Me voy a evaluar yo",
   whoHelper: "Estoy ayudando a otra persona",
-  whoHelperNote: "Muy bien. Usted colocará el teléfono y se quedará a su lado durante las pruebas.",
+  whoHelperNote: "Usted sostendrá el teléfono, hará las preguntas y se quedará a su lado durante las pruebas.",
   whoSelfNote: "Necesitará a alguien cerca durante las pruebas de caminar y levantarse, por seguridad.",
 
   profileTitle: "Sobre la persona que se evalúa",
@@ -324,7 +401,7 @@ const es: Strings = {
   nameLabel: "Nombre (opcional)",
   namePlaceholder: "p. ej. María",
   ageLabel: "Edad",
-  sexLabel: "Sexo (solo para la tabla de comparación de los CDC)",
+  sexLabel: "Sexo",
   female: "Mujer",
   male: "Hombre",
   heightLabel: "Estatura",
@@ -354,7 +431,7 @@ const es: Strings = {
 
   resultTitleRisk: "Detección: en riesgo de caídas",
   resultBodyRisk:
-    "Al menos una respuesta fue sí. Los CDC recomiendan revisar la fuerza y el equilibrio. Las dos pruebas toman unos 5 minutos.",
+    "Al menos una respuesta fue sí. Los CDC recomiendan revisar la fuerza y el equilibrio. Las tres pruebas toman unos 10 minutos.",
   resultTitleBaseline: "Detección: sin respuestas de riesgo",
   resultBodyBaseline:
     "Todas las respuestas fueron no. Puede hacer las pruebas para tener una referencia y compararla el próximo año.",
@@ -554,6 +631,74 @@ const es: Strings = {
   gateStanding: "De pie y derecho/a",
   gateNotStanding: "Póngase de pie, mirando al teléfono",
 
+
+  // DRAFT Spanish, pending native review (added with the Settings sheet and new onboarding).
+  settings: "Ajustes",
+  done: "Listo",
+  themeLabel: "Colores",
+  themeAuto: "Automático (como este teléfono)",
+  themeNames: {
+    "clinic-light": "Claro",
+    "clinic-dark": "Oscuro",
+    "signal-light": "Alto contraste, claro",
+    "signal-dark": "Alto contraste, oscuro",
+    "cvd-safe": "Para daltonismo",
+    "low-glare": "Poco brillo (cálido, oscuro)",
+  },
+  textSample: "Siéntese bien atrás en la silla.",
+
+  diaAltTug: "Vista desde arriba: la silla contra la pared, un recorrido de 3 m hasta una marca de cinta y de regreso, y el teléfono en un soporte a 2 o 3 m de lado, con la vista de la cámara cubriendo la silla y la marca",
+  diaAltChair: "Vista desde arriba y de lado: la silla contra la pared con asiento de 43 cm, la persona sentada con los brazos cruzados y el teléfono en un soporte a 1 o 2 m de lado, a la altura de la cadera",
+  diaAltMeasure: "Vista desde arriba: una cinta métrica extendida 3 m en línea recta desde el borde del asiento, con una marca de cinta a los 3 m",
+  diaWall: "pared",
+  diaChair: "silla",
+  diaMark: "marca",
+  diaPhone: "teléfono a la altura de la cadera",
+  diaPhoneShort: "teléfono",
+  diaView: "vista de la cámara",
+  diaSide: "vista de lado",
+  diaSeat: "asiento 43 cm (17 pulg)",
+  diaHip: "altura de cadera",
+  diaTape: "cinta métrica",
+  allChecked: "Los 5 marcados",
+  summaryTitle: "Resultado de la evaluación",
+  summaryTitleNamed: (name: string) => `Evaluación de ${name}`,
+  summaryRisk: "En riesgo de caídas",
+  summaryOk: "Sin respuestas de riesgo",
+
+  homeTitle: "Revise el riesgo de caídas en casa",
+  homeSub: "Tres pruebas cortas de los CDC, medidas con la cámara del teléfono. Unos 10 minutos.",
+  homeNeedTitle: "Necesitará",
+  homeNeed: [
+    "Una silla firme sin brazos",
+    "Unos 4 m (13 pies) de piso despejado",
+    "Alguien que se quede a su lado durante las pruebas",
+  ],
+  homePrivacy: "El video nunca sale de este teléfono. Solo se guardan los números.",
+  homeStart: "Empezar",
+  devLink: "Desarrollo: prueba de cámara",
+
+  stepOf: (n: number, total: number) => `Paso ${n} de ${total}`,
+  questionOf: (n: number) => `Pregunta ${n} de 3`,
+  aboutTitleSelf: "Sobre usted",
+  aboutTitleHelper: "Sobre la persona a quien ayuda",
+  aboutSub: "Solo se usa para comparar con las tablas de los CDC. Se queda en este teléfono.",
+  nameLabelSelf: "Su nombre",
+  nameLabelHelper: "Su nombre (de la persona)",
+  optional: "opcional",
+  nameHint: "Aparece en los resultados, para que la familia sepa de quién son.",
+  ageLabelSelf: "Su edad",
+  ageLabelHelper: "Edad de la persona",
+  years: "años",
+  sexHint: "Solo se usa para elegir la tabla de comparación de los CDC.",
+  bodyTitle: "Estatura y aparato para caminar",
+  heightHint: "Se usa para medir la línea de 3 m con la cámara.",
+  aidLabelSelf: "¿Usa normalmente un aparato para caminar?",
+  askName: (name: string) => `Pregúntele a ${name}:`,
+  askThem: "Pregúntele:",
+  helperAskNote: "Lea la pregunta en voz alta y toque su respuesta.",
+  readAloud: "Leer en voz alta",
+  summaryNext: "Ahora: una revisión rápida de seguridad y luego tres pruebas cortas.",
 
   // DRAFT Spanish, pending native review (added Nov 11 with the app shell).
   langGroup: "Idioma",

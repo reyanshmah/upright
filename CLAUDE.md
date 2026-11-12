@@ -42,7 +42,7 @@ Upright is a phone-only CDC STEADI fall-risk screen (Timed Up and Go + 30-Second
 
 **Signal layer (`lib/signal/`):** `thresholds.ts` is the one config file (CDC values, `ALGO`, `GATES`, `FEATURES`, `POSTURE`, `TUG`, `CHAIR`, `CONFIG_VERSION`). `gate.ts` has `StableFlag` hysteresis and the gate log; `geometry.ts` has the whole-body gate; `oneEuro.ts` smooths.
 
-**Other modules:** `lib/i18n.ts` (EN/ES; Spanish needs a fluent review), `lib/report.ts` (family plan order + text), `lib/measure.ts` (3 m math), `lib/voice.ts` (MP3 from `public/audio/<lang>/` if present, else browser speech; `getLastCueSource()` records which was used), `lib/displayPrefs.ts` (text size and dyslexia-font settings, applied as `data-text` / `data-font` on `<html>` before paint). `public/sw.js` + `app/manifest.ts` are the PWA shell (the worker registers in production builds only).
+**Other modules:** `lib/i18n.ts` (EN/ES; Spanish needs a fluent review), `lib/report.ts` (family plan order + text), `lib/measure.ts` (3 m math), `lib/voice.ts` (MP3 from `public/audio/<lang>/` if present, else browser speech; `getLastCueSource()` records which was used), `components/SettingsSheet.tsx` (the header's Settings: language from `LANGS` in `lib/i18n.ts`, text size and dyslexia font via `lib/displayPrefs.ts`, colors via `lib/themePref.ts`; all applied as `data-*` on `<html>` before paint), `lib/langPref.ts` (`detectLang()`: saved choice, else the phone's language). `public/sw.js` + `app/manifest.ts` are the PWA shell (the worker registers in production builds only).
 
 ## Rules for changes (from MASTER.md)
 

@@ -13,7 +13,7 @@ import { STRINGS, type Lang, type Strings } from "../lib/i18n";
 import type { Gates } from "../lib/pose/usePoseCamera";
 import type { ChairEntry, TugEntry } from "../lib/session";
 import { ALGO, scoreChairStand, type Sex } from "../lib/signal/thresholds";
-import { AppShell } from "./AppShell";
+import { AppShell, PinnedRow } from "./AppShell";
 import { SetupDiagram } from "./Diagram";
 import { StatusBadge } from "./StatusBadge";
 import { TugResultCard } from "./TugResultCard";
@@ -116,7 +116,9 @@ export function TestScreen(p: TestScreenProps) {
       </button>
     );
   } else if (phase === "position") {
-    pinned = p.allOk ? (
+    pinned = (
+      <PinnedRow back={p.on.backToIntro} backLabel={t.back}>
+        {p.allOk ? (
       <button type="button" className="btn btn--primary" disabled={!p.gateReady} onClick={p.on.begin}>
         {t.startTest}
       </button>
@@ -129,6 +131,8 @@ export function TestScreen(p: TestScreenProps) {
       >
         {t.fixItems}
       </button>
+    )}
+      </PinnedRow>
     );
   } else if (testing) {
     pinned = stop;
@@ -195,9 +199,9 @@ export function TestScreen(p: TestScreenProps) {
           </ol>
           <h2 className="h2">{t.placementTitle}</h2>
           <p>{kind === "tug" ? t.tugPlace : t.chairPlace}</p>
-          <SetupDiagram kind={kind} />
+          <SetupDiagram kind={kind} lang={p.lang} />
           <p className="note">{t.spotterTip}</p>
-          <button type="button" className="btn btn--secondary" onClick={() => p.on.skip("user skipped")}>
+          <button type="button" className="linkish" onClick={() => p.on.skip("user skipped")}>
             {t.skipTest}
           </button>
         </>
@@ -213,9 +217,6 @@ export function TestScreen(p: TestScreenProps) {
               </li>
             ))}
           </ul>
-          <button type="button" className="btn btn--secondary" onClick={p.on.backToIntro}>
-            {t.back}
-          </button>
         </>
       )}
 
@@ -237,7 +238,7 @@ export function TestScreen(p: TestScreenProps) {
       {phase === "aborted" && (
         <>
           <StatusBadge kind="none">{p.abortNote || t.aborted}</StatusBadge>
-          <button type="button" className="btn btn--secondary" onClick={() => p.on.skip("stopped for safety")}>
+          <button type="button" className="linkish" onClick={() => p.on.skip("stopped for safety")}>
             {t.skipTest}
           </button>
           {p.canDownload && (
@@ -258,7 +259,7 @@ export function TestScreen(p: TestScreenProps) {
               <p>{p.failMsg}</p>
             </div>
           )}
-          <button type="button" className="btn btn--secondary" onClick={() => p.on.skip("could not measure")}>
+          <button type="button" className="linkish" onClick={() => p.on.skip("could not measure")}>
             {t.skipTest}
           </button>
           {p.canDownload && (

@@ -2,142 +2,383 @@
  * App layer on top of styles/tokens.css (loaded first in app/layout.tsx).
  * Colors come only from the theme tokens, so every theme works; sizes use rem
  * so the phone's text-size setting applies.
+ *
+ * Built for older eyes and hands: one idea per screen, 16-24 px rhythm,
+ * targets of 56-64 px, selection shown by shape (filled dot, check) as well
+ * as color, and secondary text that is still high contrast.
  */
 
 *, *::before, *::after { box-sizing: border-box; }
+/* Break inside a word only when that one word cannot fit the line (tokens.css allows breaking anywhere). */
+body { overflow-wrap: break-word; }
+
+/* ---------- Scale ---------- */
 
 /*
  * Text scaling. Body text follows the phone's text size (and the in-app
  * "Large" setting) in full. Display text (titles, live status, timer, big
  * numbers) only partly follows it: a fixed px part plus a rem part, so it
- * grows with the setting but not as fast. Sizes at default text equal the
- * token sizes; at 1.5x text, body is 1.5x and display text is about 1.2-1.3x.
+ * grows with the setting but not as fast.
  */
 :root {
   --fs-h1-d: calc(14px + 0.875rem);     /* 28 px at default text (= --fs-h1) */
   --fs-h2: calc(10px + 0.75rem);        /* 22 px */
+  --fs-lead: calc(2px + 1.0625rem);     /* 19 px */
   --fs-live: calc(16px + 1rem);         /* 32 px: phase line, gate fix message */
   --fs-timer: calc(48px + 2rem);        /* 80 px: LiveTest timer */
   --fs-num-d: calc(40px + 2rem);        /* 72 px (= --fs-num) */
   --fs-go: calc(64px + 3rem);           /* 112 px (= --fs-num-xl) */
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --choice-h: 64px;
 }
-.h1 { font-size: var(--fs-h1-d); }
+/* Selected / highlighted surfaces: a light wash of the action color over the card (per theme). */
+:root, [data-theme] { --tint: color-mix(in srgb, var(--act) 12%, var(--card)); }
+.h1 { font-size: var(--fs-h1-d); margin: 0; letter-spacing: -0.005em; }
 .num { font-size: var(--fs-num-d); }
 .timer { font-size: min(var(--fs-timer), 26vw); }
 
 /* In-app text size: "Large" = 120% on top of the phone's own setting. */
 html[data-text="large"] { font-size: 120%; }
 
-/* In-app font: OpenDyslexic (SIL OFL 1.1, public/fonts/opendyslexic/OFL.txt), loaded only when chosen. */
-@font-face { font-family: "OpenDyslexic"; src: url("/fonts/opendyslexic/opendyslexic-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "OpenDyslexic"; src: url("/fonts/opendyslexic/opendyslexic-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+/* In-app font: OpenDyslexic (license in public/fonts/opendyslexic/LICENSE.txt), loaded only when chosen.
+   This build is used because the newer one draws ó/Ó with a misplaced accent. */
+@font-face { font-family: "OpenDyslexic"; src: url("/fonts/opendyslexic/OpenDyslexic-Regular.woff") format("woff"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "OpenDyslexic"; src: url("/fonts/opendyslexic/OpenDyslexic-Bold.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
 html[data-font="dyslexic"] {
   --font-head: "OpenDyslexic", var(--font-atkinson), Arial, sans-serif;
   --font-body: "OpenDyslexic", var(--font-atkinson), Arial, sans-serif;
   --lh-body: 1.6;
 }
-/* Header controls keep the standard font so the header stays one row; the font option previews itself. */
-html[data-font="dyslexic"] .app__header, html[data-font="dyslexic"] .app__name { font-family: var(--font-atkinson), "Atkinson Hyperlegible", Arial, sans-serif; }
-.seg__dyslexic { font-family: "OpenDyslexic", var(--font-atkinson), Arial, sans-serif !important; }
+
+/* ---------- Shell ---------- */
 
 /* The shell fills the screen exactly so the pinned bar never scrolls away. */
 .app { height: 100dvh; }
 .app__header {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
   border-bottom: var(--card-bw) solid var(--line);
-  padding-top: calc(8px + env(safe-area-inset-top));
-  container: appbar / inline-size;
 }
-/*
- * One header row: when logo + name + Aa + English + Español don't fit (large
- * text), the word "Upright" is hidden visually and
- * the logo stands for it; screen readers still read the name.
- */
-@container appbar (max-width: 20.5rem) {
-  .app__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-}
-.app__name { display: flex; align-items: center; gap: 6px; font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-body); }
-.app__logo { width: 30px; height: 30px; flex: none; display: block; }
-.app__tools { display: flex; gap: 4px; margin-left: auto; }
-.lang-toggle { display: flex; gap: 4px; }
-.display-btn,
-.seg button {
+.app__name, .header-btn { font-family: var(--font-atkinson), "Atkinson Hyperlegible", Arial, sans-serif; }
+.app__name { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-body); }
+.app__logo { width: 32px; height: 32px; flex: none; display: block; }
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
   min-height: var(--target-min);
-  min-width: var(--target-min);
-  padding: 8px 10px;
+  padding: var(--sp-2) 14px;
   font: inherit;
   font-size: var(--fs-label);
   font-weight: 700;
   color: var(--ink);
-  background: transparent;
+  background: var(--card);
   border: 2px solid var(--line);
   border-radius: var(--radius);
   cursor: pointer;
+  flex: none;
 }
-.display-btn[aria-expanded="true"],
-.seg button[aria-pressed="true"] { background: var(--act); color: var(--on-act); border: 2px solid var(--act); }
-.display-panel { flex-basis: 100%; display: grid; gap: 8px; padding: 4px 0 4px; }
-.seg { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
-.seg__label { flex-basis: 100%; font-size: var(--fs-label); font-weight: 700; color: var(--ink-2); }
-.seg button { flex: 1 1 0; }
-.lang-toggle button {
-  min-height: var(--target-min);
-  min-width: var(--target-min);
-  padding: 8px 10px;
-  font: inherit;
-  font-size: var(--fs-label);
-  font-weight: 700;
-  color: var(--ink);
-  background: transparent;
-  border: 2px solid var(--line);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.lang-toggle button[aria-pressed="true"] { background: var(--act); color: var(--on-act); border: 2px solid var(--act); }
+.header-btn[aria-expanded="true"] { border-color: var(--act); }
 
+.app__scroll { padding: 20px var(--sp-4) var(--sp-5); gap: var(--sp-5); }
+/* Content never squashes to fit; the region scrolls instead. */
+.app__scroll > * { flex-shrink: 0; }
 .app__scroll p, .app__scroll h1, .app__scroll h2, .app__scroll ul, .app__scroll ol { margin: 0; }
-.h1 { margin: 0; }
+.disclaimer { margin-top: auto; padding-top: var(--sp-4); border-top: var(--card-bw) solid var(--line); font-size: var(--fs-label); color: var(--ink-2); display: grid; gap: var(--sp-1); }
+
+/* Bottom bar: Back (compact) next to the main action (fills the rest). */
+.pinned { gap: var(--sp-3); container: pinned / inline-size; }
+.pinned__row { display: flex; gap: var(--sp-3); align-items: stretch; }
+.pinned__row > .btn { flex: 1 1 auto; }
+.pinned__row > .pinned__back {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: var(--btn-primary-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-4) 0 var(--sp-3);
+}
+/* Large text: Back keeps only its arrow so the main action has room; the word stays for screen readers. */
+@container pinned (max-width: 19rem) {
+  .pinned__back { padding: 0 var(--sp-3); }
+  .pinned__back span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/* ---------- Type and text blocks ---------- */
+
+.h2 { font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-h2); line-height: 1.3; margin: 0; }
 .h1--compact { font-size: var(--fs-body); }
-.h2 { font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-h2); line-height: 1.3; margin: 8px 0 0; }
-.stack { display: flex; flex-direction: column; gap: 14px; }
+.lead { font-size: var(--fs-lead); line-height: 1.5; }
 .muted { color: var(--ink-2); }
 .small { font-size: var(--fs-label); }
 .big { font-size: 1.35rem; font-weight: 700; }
 .eyebrow { font-size: var(--fs-label); font-weight: 700; color: var(--ink-2); }
-.disclaimer { margin-top: auto; padding-top: 12px; border-top: var(--card-bw) solid var(--line); font-size: var(--fs-label); color: var(--ink-2); display: grid; gap: 4px; }
+.label { color: var(--ink); }
+.label--lg { font-size: var(--fs-body); }
+.label__optional { font-weight: 400; color: var(--ink-2); }
+.stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+.stack-sm { display: flex; flex-direction: column; gap: var(--sp-2); }
 
-/* Buttons (base styles in tokens.css) */
+/* Footnote: small helper text with an icon, not a box. */
+.footnote { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-label); color: var(--ink-2); line-height: 1.45; }
+.footnote .icon { flex: none; margin-top: 1px; }
+/* Callout: something to act on (tell the doctor). A bar on the side, not a full box. */
+.callout, .note { padding: var(--sp-3) var(--sp-4); border-left: 4px solid var(--act); background: var(--card); border-radius: 0 var(--radius) var(--radius) 0; font-weight: 700; }
+.note { font-weight: 400; }
+.callout { border-left-color: var(--risk-bd); }
+.note.bad { border-left-color: var(--risk-bd); background: var(--risk-bg); color: var(--risk-fg); }
+.hint { font-size: var(--fs-label); color: var(--ink-2); line-height: 1.45; }
+.field-error { font-size: var(--fs-label); font-weight: 700; color: var(--risk-fg); }
+
+/* ---------- Buttons and links ---------- */
+
 a.btn { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
 .btn:disabled, .btn[aria-disabled="true"] { cursor: not-allowed; }
 .btn--primary:disabled { background: var(--slate); color: var(--slate-fg); border: var(--slate-bd); }
-.pinned .btn--secondary { min-height: var(--target-min); }
-.linkish { align-self: flex-start; min-height: var(--target-min); background: none; border: none; color: var(--ink); text-decoration: underline; font: inherit; font-size: var(--fs-label); padding: 8px 0; cursor: pointer; }
+.linkish {
+  align-self: flex-start;
+  min-height: var(--target-min);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.linkish--icon { text-decoration: none; font-weight: 700; }
+.linkish--icon span { text-decoration: underline; text-underline-offset: 3px; }
+.icon { display: block; flex: none; }
+.icon--flip { transform: scaleX(-1); }
+.dev-link { display: inline-flex; align-items: center; min-height: var(--target-min); font-size: var(--fs-label); color: var(--ink-2); }
 
-/* Status and results */
+/* ---------- Progress ---------- */
+
+.progress { display: grid; gap: var(--sp-2); }
+.progress__label { font-size: var(--fs-label); font-weight: 700; color: var(--ink-2); }
+.progress__track { display: block; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.progress__fill { display: block; height: 100%; border-radius: 4px; background: var(--act); }
+
+/* ---------- Choices (radio cards) ---------- */
+
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.choice-group { display: grid; gap: var(--sp-3); }
+.choice-group > legend { padding: 0; margin-bottom: var(--sp-3); }
+.choice-group > legend.h1 { margin-bottom: var(--sp-4); }
+.choice-group > legend + .hint { margin-top: calc(-1 * var(--sp-2)); }
+.choices { display: grid; gap: var(--sp-3); }
+/* Side by side only while every label fits on one line; otherwise the cards wrap (large text, long words). */
+.choices--row, .choices--grid { display: flex; flex-wrap: wrap; }
+.choices--row > .choice { flex: 1 1 0; min-width: min(100%, max-content); }
+.choices--grid > .choice { flex: 1 1 calc(50% - var(--sp-3)); min-width: min(100%, max-content); }
+.choice, .opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--choice-h);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--card);
+  color: var(--ink);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.choice input, .opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.choice__dot, .opt__dot {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-2);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+}
+.choice__dot::after, .opt__dot::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: transparent; }
+.choice:has(input:checked), .opt:has(input:checked) { border-color: var(--act); background: var(--tint); box-shadow: inset 0 0 0 1px var(--act); }
+.choice:has(input:checked) .choice__dot, .opt:has(input:checked) .opt__dot { border-color: var(--act); }
+.choice:has(input:checked) .choice__dot::after, .opt:has(input:checked) .opt__dot::after { background: var(--act); }
+.choice:has(input:focus-visible), .opt:has(input:focus-visible) { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-offset); }
+.choice__text { display: grid; gap: 2px; min-width: 0; }
+.choice__label { font-weight: 700; }
+.choice__sub { font-size: var(--fs-label); color: var(--ink-2); }
+
+/* STEADI question screens */
+.ask-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; }
+.ask { font-size: var(--fs-lead); font-weight: 700; color: var(--ink-2); }
+.ask-row .linkish { align-self: center; }
+.question { line-height: 1.25; }
+.followup { padding-left: var(--sp-4); border-left: 4px solid var(--line); }
+
+/* ---------- Fields ---------- */
+
+.field { display: grid; gap: var(--sp-2); }
+.input {
+  width: 100%;
+  min-height: 56px;
+  padding: var(--sp-3) 14px;
+  font: inherit;
+  font-size: 1.25rem;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--ink-2);
+  border-radius: var(--radius);
+}
+.input::placeholder { color: var(--ink-2); opacity: 0.75; }
+.input[aria-invalid="true"] { border-color: var(--risk-bd); }
+.input--short { width: 6.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+.input-unit { display: inline-flex; align-items: center; gap: 10px; }
+.input-unit__suffix { font-weight: 700; color: var(--ink-2); }
+.input-row { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.segmented { display: inline-flex; justify-self: start; border: 2px solid var(--ink-2); border-radius: var(--radius); overflow: hidden; }
+.segmented button { min-height: var(--target-min); padding: var(--sp-2) var(--sp-4); font: inherit; font-weight: 700; background: var(--card); color: var(--ink); border: 0; cursor: pointer; }
+.segmented button + button { border-left: 2px solid var(--ink-2); }
+.segmented button[aria-pressed="true"] { background: var(--act); color: var(--on-act); }
+
+/* ---------- Checklist (safety) ---------- */
+
+.checklist { list-style: none; padding: 0; display: grid; gap: var(--sp-3); }
+.checklist label {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-height: var(--choice-h);
+  padding: var(--sp-4);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.checklist input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.checklist__box {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink-2);
+  border-radius: 6px;
+  background: var(--card);
+  color: transparent;
+}
+.checklist label:has(input:checked) { border-color: var(--act); background: var(--tint); }
+.checklist label:has(input:checked) .checklist__box { background: var(--act); border-color: var(--act); color: var(--on-act); }
+.checklist label:has(input:focus-visible) { outline: var(--ring-w) solid var(--ring); outline-offset: var(--ring-offset); }
+
+/* ---------- Action cards (pick one and go) ---------- */
+
+.action-list { display: grid; gap: var(--sp-3); }
+.action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: var(--choice-h);
+  padding: var(--sp-3) var(--sp-4);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/* ---------- Home ---------- */
+
+.hero { display: grid; gap: var(--sp-3); justify-items: start; padding-top: var(--sp-2); }
+.hero__logo { width: 88px; height: 88px; display: block; margin-bottom: var(--sp-1); }
+.icon-list { list-style: none; padding: 0; display: grid; gap: var(--sp-3); }
+.icon-list li { display: flex; gap: 14px; align-items: center; }
+.icon-list__icon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--tint); color: var(--ink); border: var(--card-bw) solid var(--line); }
+
+/* ---------- Settings sheet ---------- */
+
+dialog.sheet {
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  width: 100%;
+  max-width: var(--app-max);
+  height: 100dvh;
+  max-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+}
+dialog.sheet[open] { display: flex; flex-direction: column; }
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
+.sheet__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
+  border-bottom: var(--card-bw) solid var(--line);
+}
+.sheet__done { width: auto; min-height: var(--target-min); padding: var(--sp-2) var(--sp-5); }
+.sheet__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px var(--sp-4) calc(var(--sp-6) + env(safe-area-inset-bottom));
+  display: grid;
+  align-content: start;
+  gap: var(--sp-5);
+}
+.opt-group > legend { padding: 0; margin-bottom: var(--sp-2); }
+.opt-list { display: grid; gap: var(--sp-2); }
+.opt { min-height: 56px; }
+.opt__text { min-width: 0; font-weight: 700; }
+.opt__large { font-size: 1.2em; }
+.opt__dyslexic { font-family: "OpenDyslexic", var(--font-atkinson), Arial, sans-serif; }
+.opt__standard { font-family: var(--font-atkinson), "Atkinson Hyperlegible", Arial, sans-serif; }
+.opt__theme { display: flex; align-items: center; gap: var(--sp-3); }
+.swatch { flex: none; width: 44px; height: 30px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 2px solid; border-radius: 6px; }
+.swatch span { width: 11px; height: 11px; border-radius: 50%; }
+.sheet__sample { margin-top: var(--sp-2) !important; padding: var(--sp-4); background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); font-size: var(--fs-lead); }
+
+/* ---------- Status and results ---------- */
+
 .badge > span { min-width: 0; }
-.card.result { display: flex; flex-direction: column; gap: 10px; }
+.card.result { display: flex; flex-direction: column; gap: var(--sp-3); }
 .card--risk { border: var(--status-bw) solid var(--risk-bd); }
 .card--ok { border: var(--status-bw) solid var(--ok-bd); }
-.result__number { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.result__number { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
 .result__unit { font-size: var(--fs-body); font-weight: 700; }
-.rows { list-style: none; padding: 0; display: grid; gap: 6px; }
-.rows li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: var(--card-bw) solid var(--line); }
-.note { background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
-.note.bad { background: var(--risk-bg); color: var(--risk-fg); border: var(--status-bw) solid var(--risk-bd); }
+.rows { list-style: none; padding: 0; display: grid; }
+.rows li { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); flex-wrap: wrap; padding: 10px 0; border-top: var(--card-bw) solid var(--line); }
+.rows li:first-child { border-top: 0; }
 
-/* Test screens */
+/* ---------- Test screens ---------- */
+
 .live-status { font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-live); line-height: 1.25; }
-.live { display: flex; flex-direction: column; gap: 4px; }
+.live { display: flex; flex-direction: column; gap: var(--sp-1); }
 .go-cue {
   width: 100%;
   margin: 0;
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   text-align: center;
   font-family: var(--font-head);
   font-weight: var(--w-num);
@@ -148,8 +389,24 @@ a.btn { display: flex; align-items: center; justify-content: center; text-align:
   border: var(--act-bd);
   border-radius: var(--radius);
 }
-.gate-list { list-style: none; padding: 0; display: grid; gap: 8px; }
-.steps { padding-left: 1.4em; display: grid; gap: 8px; }
+.gate-list { list-style: none; padding: 0; display: grid; gap: var(--sp-2); }
+/* Numbered steps: the number sits in a circle, the text wraps beside it. */
+.steps { list-style: none; padding: 0; display: grid; gap: var(--sp-3); counter-reset: step; }
+.steps li { counter-increment: step; display: flex; gap: var(--sp-3); align-items: flex-start; }
+.steps li::before {
+  content: counter(step);
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--tint);
+  color: var(--ink);
+  border: var(--card-bw) solid var(--line);
+  font-weight: 700;
+  font-size: var(--fs-label);
+}
 .camline { font-size: var(--fs-label); }
 
 /* Camera stage: the overlay sits on video, so it uses fixed light-on-dark text. */
@@ -159,72 +416,38 @@ a.btn { display: flex; align-items: center; justify-content: center; text-align:
 .stage-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .big-readout { font-size: clamp(3rem, 14vw, 6rem); font-weight: 800; color: #fff; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7); }
 
-/* Onboarding */
-.progress { display: flex; gap: 6px; }
-.progress span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
-.progress span.on { background: var(--act); }
-.choices { display: flex; flex-direction: column; gap: 10px; }
-.choices.big .choice { font-size: 1.3rem; padding: 22px; }
-.choice {
-  text-align: left;
-  font: inherit;
-  font-size: var(--fs-body);
-  padding: 14px 16px;
-  min-height: var(--btn-primary-h);
-  border-radius: var(--radius);
-  border: 2px solid var(--line);
-  background: var(--card);
-  color: var(--ink);
-  cursor: pointer;
-}
-.choice.selected, .choice[aria-pressed="true"] { border: 3px solid var(--act); font-weight: 700; }
-.question .choices, .field .choices { flex-direction: row; flex-wrap: wrap; }
-.question .choice, .field .choice { flex: 1 1 120px; text-align: center; }
-.field { display: block; }
-.field > span { display: block; font-weight: 700; margin-bottom: 6px; }
-.field input, .inline-inputs input {
-  width: 100%;
-  font: inherit;
-  font-size: 1.2rem;
-  padding: 12px;
-  min-height: var(--target-min);
-  border-radius: var(--radius);
-  border: 2px solid var(--ink-2);
-  background: var(--card);
-  color: var(--ink);
-}
-.question { display: grid; gap: 8px; }
-.question p { font-size: 1.2rem; font-weight: 700; }
-.followup { border-left: 4px solid var(--line); padding-left: 14px; display: grid; gap: 14px; }
-.unit-toggle { display: inline-flex; border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-bottom: 8px; }
-.unit-toggle button { font: inherit; min-height: var(--target-min); padding: 8px 14px; border: none; background: var(--card); color: var(--ink); cursor: pointer; }
-.unit-toggle button.on { background: var(--act); color: var(--on-act); }
-.inline-inputs { display: flex; gap: 12px; }
-.inline-inputs label { display: flex; align-items: center; gap: 6px; flex: 1; }
-.checklist { list-style: none; padding: 0; display: grid; gap: 8px; }
-.checklist label { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; }
-.checklist input { width: 28px; height: 28px; flex: none; accent-color: var(--act); margin-top: 2px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .nav { justify-content: space-between; }
-.diagram { width: 100%; max-width: 420px; display: block; color: var(--ink); background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); }
+.diagram { width: 100%; height: auto; display: block; color: var(--ink); background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); }
 
-/* Results */
-.plan { padding-left: 1.4em; display: grid; gap: 12px; }
-.plan p { margin-top: 4px; }
-.clinician { font-size: var(--fs-label); display: grid; gap: 10px; }
+/* ---------- Results ---------- */
+
+.plan { padding-left: 1.4em; display: grid; gap: var(--sp-3); }
+.plan p { margin-top: var(--sp-1); }
+.clinician { font-size: var(--fs-label); display: grid; gap: 10px; overflow-wrap: anywhere; }
 .clinician table { width: 100%; border-collapse: collapse; }
-.clinician th, .clinician td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: var(--card-bw) solid var(--line); }
+.clinician th, .clinician td { text-align: left; vertical-align: top; padding: var(--sp-2) 6px; border-top: var(--card-bw) solid var(--line); }
 .clinician th { width: 28%; }
 
-/* Developer pose page */
-.dev { max-width: 720px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; }
-.hud { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
-.stat { background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+/* ---------- 4-Stage Balance ---------- */
+
+.stance-icon { width: 28px; height: 28px; vertical-align: middle; color: var(--ink); margin-right: 6px; flex: none; }
+.stance-icon.big { width: 72px; height: 72px; margin: 0; }
+.stance-card { display: flex; gap: 14px; align-items: center; background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); padding: var(--sp-3) 14px; }
+.stance-card .instruction { margin: 0; font-weight: 700; }
+.small-list { padding-left: 1.2em; font-size: var(--fs-label); color: var(--ink-2); display: grid; gap: var(--sp-1); }
+
+/* ---------- Developer pose page ---------- */
+
+.dev { max-width: 720px; margin: 0 auto; padding: var(--sp-4); display: grid; gap: var(--sp-3); }
+.hud { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-2); }
+.stat { background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); padding: 10px var(--sp-3); }
 .stat b { display: block; font-size: 1.4rem; }
 .ok { color: var(--ok-fg); }
 .bad { color: var(--risk-fg); }
 
-/* AR measuring overlay (drawn over the live camera by WebXR dom-overlay) */
+/* ---------- AR measuring overlay (drawn over the live camera by WebXR dom-overlay) ---------- */
+
 .ar-overlay { display: none; }
 .ar-overlay.on { display: block; position: fixed; inset: 0; color: #fff; font-size: 1.1rem; }
 .ar-cross {
@@ -247,14 +470,7 @@ a.btn { display: flex; align-items: center; justify-content: center; text-align:
   html, body { background: #fff; color: #000; font-size: 12px; }
   .app { height: auto; }
   .app__scroll { overflow: visible; }
-  .app__header, .pinned, .btn, .linkish, .nav, .disclaimer { display: none !important; }
+  .app__header, .pinned, .btn, .linkish, .nav, .disclaimer, dialog { display: none !important; }
   body[data-print="clinician"] .family { display: none; }
   body[data-print="clinician"] .clinician { border: none; margin: 0; padding: 0; }
 }
-
-/* 4-Stage Balance */
-.stance-icon { width: 28px; height: 28px; vertical-align: middle; color: var(--ink); margin-right: 6px; flex: none; }
-.stance-icon.big { width: 72px; height: 72px; margin: 0; }
-.stance-card { display: flex; gap: 14px; align-items: center; background: var(--card); border: var(--card-bw) solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
-.stance-card .instruction { margin: 0; font-weight: 700; }
-.small-list { padding-left: 1.2em; font-size: var(--fs-label); color: var(--ink-2); display: grid; gap: 4px; }

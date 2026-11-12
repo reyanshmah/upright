@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { STRINGS, type Lang } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { gateRows, type GateRow } from "@/components/TestScreens";
 import { playCue, playCueAndWait, unlockAudio, type CueId } from "@/lib/voice";
@@ -226,7 +226,9 @@ export function BalanceRunner({
       </button>
     );
   } else if (phase === "position") {
-    pinned = allOk ? (
+    pinned = (
+      <PinnedRow back={() => { cam.stop(); setPhase("intro"); }} backLabel={t.back}>
+        {allOk ? (
       <button type="button" className="btn btn--primary" disabled={!gateReady} onClick={() => void run()}>
         {t.startTest}
       </button>
@@ -239,6 +241,8 @@ export function BalanceRunner({
       >
         {t.fixItems}
       </button>
+    )}
+      </PinnedRow>
     );
   } else if (phase === "running") {
     pinned = (
@@ -313,7 +317,7 @@ export function BalanceRunner({
           <h2 className="h2">{t.placementTitle}</h2>
           <p>{t.balPlace}</p>
           <p className="note">{t.spotterTip}</p>
-          <button type="button" className="btn btn--secondary" onClick={() => onSkip("user skipped")}>
+          <button type="button" className="linkish" onClick={() => onSkip("user skipped")}>
             {t.skipTest}
           </button>
         </>
@@ -336,16 +340,13 @@ export function BalanceRunner({
               </li>
             ))}
           </ul>
-          <button type="button" className="btn btn--secondary" onClick={() => { cam.stop(); setPhase("intro"); }}>
-            {t.back}
-          </button>
         </>
       )}
 
       {phase === "aborted" && (
         <>
           <StatusBadge kind="none">{t.aborted}</StatusBadge>
-          <button type="button" className="btn btn--secondary" onClick={() => onSkip("stopped for safety")}>
+          <button type="button" className="linkish" onClick={() => onSkip("stopped for safety")}>
             {t.skipTest}
           </button>
         </>
@@ -357,7 +358,7 @@ export function BalanceRunner({
             <StatusBadge kind="none">{t.badgeRefused}</StatusBadge>
             <p>{t.balLost}</p>
           </div>
-          <button type="button" className="btn btn--secondary" onClick={() => onSkip("could not measure")}>
+          <button type="button" className="linkish" onClick={() => onSkip("could not measure")}>
             {t.skipTest}
           </button>
           {stream.current && (
