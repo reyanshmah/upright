@@ -137,10 +137,14 @@ export function PoseMeasure({
     setStage("stand");
   };
 
-  const exit = () => {
+  const stopCamera = () => {
     cam.stop();
+    ppm.current = null;
+    startX.current = null;
+    recent.current = [];
+    setDist(null);
+    setReady(false);
     setStage("idle");
-    onBack();
   };
 
   const atTarget = dist !== null && Math.abs(dist - TARGET_M) <= TOLERANCE_M;
@@ -148,67 +152,70 @@ export function PoseMeasure({
 
   if (!heightOk) {
     return (
-      <section>
+      <section className="stack-sm">
         <div className="card card--risk">
           <p>{t.needHeight}</p>
         </div>
-        <div className="row nav">
+        <div className="row">
           <button className="btn btn--secondary" onClick={onBack}>{t.back}</button>
         </div>
       </section>
     );
   }
 
+  const instruction =
+    stage === "idle" ? t.waitBody : stage === "stand" ? t.stand : atTarget ? t.atTarget : tooFar ? t.tooFar : t.walk;
+
   return (
-    <section>
+    <section className="stack-sm">
       <p className="note">{t.approx}</p>
+      <p aria-live="polite">{instruction}</p>
+      {cam.error && <p className="note bad">{common.camErrDenied}</p>}
 
-      {stage === "idle" && (
-        <>
-          <p>{t.waitBody}</p>
-          <button className="btn btn--primary" onClick={begin}>{t.start}</button>
-          <div className="row nav">
-            <button className="btn btn--secondary" onClick={onBack}>{t.back}</button>
-          </div>
-        </>
-      )}
+      {/* Always mounted, so the camera has a video element to attach to. */}
+      <CameraStage
+        videoRef={cam.videoRef}
+        canvasRef={cam.canvasRef}
+        overlay={
+          stage === "walk" && dist !== null ? (
+            <p className={`ar-dist ${atTarget ? "ok" : tooFar ? "bad" : ""}`} style={{ color: atTarget ? undefined : "#fff", textShadow: "0 1px 6px #000" }}>
+              {dist.toFixed(2)} m <span>({cmToFtIn(dist * 100)})</span>
+            </p>
+          ) : null
+        }
+      />
 
-      {stage !== "idle" && (
-        <div className="ar-overlay on pose-measure">
-          <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} />
-          <div className="ar-top">
-            {cam.error && <p className="note bad">{common.camErrDenied}</p>}
-            {stage === "stand" && <p>{t.stand}</p>}
-            {stage === "walk" && <p>{atTarget ? t.atTarget : tooFar ? t.tooFar : t.walk}</p>}
-            {stage === "walk" && dist !== null && (
-              <p className={`ar-dist ${atTarget ? "ok" : tooFar ? "bad" : ""}`}>
-                {dist.toFixed(2)} m <span>({cmToFtIn(dist * 100)})</span>
-              </p>
-            )}
-          </div>
-          <div className="ar-bottom">
-            <button className="btn btn--secondary" onClick={exit}>{t.exit}</button>
-            {stage === "stand" ? (
-              <button className="btn btn--primary" disabled={!ready} onClick={setStart}>{t.setStart}</button>
-            ) : (
-              <>
-                <button className="btn btn--secondary" onClick={redo}>{t.redo}</button>
-                <button
-                  className="btn btn--primary"
-                  disabled={!atTarget}
-                  onClick={() => {
-                    const d = dist!;
-                    cam.stop();
-                    onDone(d);
-                  }}
-                >
-                  {t.done}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <div className="row" style={{ flexWrap: "nowrap" }}>
+        {stage === "idle" && (
+          <>
+            <button className="btn btn--secondary" style={{ flex: "0 0 auto" }} onClick={onBack}>{t.back}</button>
+            <button className="btn btn--primary" style={{ flex: 1 }} onClick={begin}>{t.start}</button>
+          </>
+        )}
+        {stage === "stand" && (
+          <>
+            <button className="btn btn--secondary" style={{ flex: 1 }} onClick={stopCamera}>{t.exit}</button>
+            <button className="btn btn--primary" style={{ flex: 1 }} disabled={!ready} onClick={setStart}>{t.setStart}</button>
+          </>
+        )}
+        {stage === "walk" && (
+          <>
+            <button className="btn btn--secondary" style={{ flex: 1 }} onClick={redo}>{t.redo}</button>
+            <button
+              className="btn btn--primary"
+              style={{ flex: 1 }}
+              disabled={!atTarget}
+              onClick={() => {
+                const d = dist!;
+                cam.stop();
+                onDone(d);
+              }}
+            >
+              {t.done}
+            </button>
+          </>
+        )}
+      </div>
     </section>
   );
 }
