@@ -59,9 +59,10 @@ export function setVoiceSpeedPref(v: VoiceSpeed): void {
 }
 
 /**
- * Auto-start: the test begins by itself once every check has been green for
- * GATES.autoStartHoldMs, so someone testing alone does not have to reach for
- * the phone after sitting down.
+ * Auto-start: each test opens the camera by itself, starts as soon as every
+ * check is green (the same hold as the Start button, GATES.allGreenHoldMs),
+ * and moves on (or retries) after the result, so someone testing alone never
+ * has to reach for the phone.
  */
 export type AutoStart = "off" | "on";
 export const AUTO_START_KEY = "upright-autostart";

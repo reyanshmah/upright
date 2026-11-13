@@ -37,7 +37,8 @@ export type CueId =
   | "bal4"
   | "hold"
   | "good"
-  | "paused";
+  | "paused"
+  | "retry";
 
 let lastCueSource: "mp3" | "speech" | "unknown" = "unknown";
 /** How the most recent cue was produced (recorded in the session file). */

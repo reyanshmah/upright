@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { STRINGS, type Lang } from "@/lib/i18n";
-import { gateRows, TestScreen, type TestPhase } from "@/components/TestScreens";
+import { AUTO_NEXT_S, gateRows, TestScreen, type TestPhase } from "@/components/TestScreens";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
 import { CameraControls } from "@/components/CameraControls";
@@ -151,7 +151,8 @@ export function TestRunner({
       if (ok) {
         gateSince.current ??= f.t;
         setGateHeldMs(f.t - gateSince.current);
-        if (p === "position" && autoStartRef.current && f.t - gateSince.current >= GATES.autoStartHoldMs) void begin();
+        // Auto-start: begin the moment Start would light up (same hold as the button).
+        if (p === "position" && autoStartRef.current && f.t - gateSince.current >= GATES.allGreenHoldMs) void begin();
       } else {
         gateSince.current = null;
         setGateHeldMs(0);
@@ -188,6 +189,35 @@ export function TestRunner({
         if (tr.phase === "failed") void finish();
       }
     }, 100);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // Auto-start: open the camera without the "Check position" tap.
+  useEffect(() => {
+    if (getAutoStart() === "on") openCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-start: after a result, move on to the next test; after a failed run, try again.
+  const [autoLeft, setAutoLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!autoStartRef.current || (phase !== "done" && phase !== "failed")) {
+      setAutoLeft(null);
+      return;
+    }
+    if (phase === "failed") void playCue(lang, "retry", t.autoRetrySpoken);
+    let left = AUTO_NEXT_S;
+    setAutoLeft(left);
+    const id = setInterval(() => {
+      left -= 1;
+      setAutoLeft(left);
+      if (left <= 0) {
+        clearInterval(id);
+        if (phase === "done") onNext();
+        else redo();
+      }
+    }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
@@ -422,6 +452,7 @@ export function TestRunner({
       rows={rows}
       notice={notice}
       autoStart={autoStart}
+      autoLeft={autoLeft}
       tips={kind === "tug" ? [...(frontal ? [t.tipSideView] : []), ...(portrait ? [t.tipTurnSideways] : [])] : []}
       allOk={rows.every((r) => r.ok)}
       gateReady={gateReady}

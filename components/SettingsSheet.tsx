@@ -19,7 +19,6 @@ import {
 } from "../lib/displayPrefs";
 import { getThemePref, setThemePref, type ThemePref } from "../lib/themePref";
 import { THEMES, type ThemeId } from "../lib/themes";
-import { GATES } from "../lib/signal/thresholds";
 
 /** Light and dark versions next to each other. */
 const THEME_ORDER: ThemeId[] = ["clinic-light", "clinic-dark", "signal-light", "signal-dark", "low-glare"];
@@ -130,7 +129,7 @@ export function SettingsSheet({
               {v === "on" ? t.autoStartOn : t.autoStartOff}
             </Option>
           ))}
-          <p className="hint">{t.autoStartHint(GATES.autoStartHoldMs / 1000)}</p>
+          <p className="hint">{t.autoStartHint}</p>
         </Group>
 
         <Group legend={t.voiceSpeedLabel}>

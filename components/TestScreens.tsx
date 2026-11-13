@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { STRINGS, type Lang, type Strings } from "../lib/i18n";
 import type { Gates } from "../lib/pose/usePoseCamera";
 import type { ChairEntry, TugEntry } from "../lib/session";
-import { ALGO, GATES, scoreChairStand, type Sex } from "../lib/signal/thresholds";
+import { ALGO, scoreChairStand, type Sex } from "../lib/signal/thresholds";
 import { AppShell, PinnedRow } from "./AppShell";
 import { SetupDiagram } from "./Diagram";
 import { StatusBadge } from "./StatusBadge";
@@ -32,6 +32,9 @@ export type TestPhase = "intro" | "position" | "instructions" | "countdown" | "r
 
 /** How long the giant Go stays on screen after the Go cue (display only; timing starts at the cue). */
 export const GO_SHOW_S = 1;
+
+/** Auto-start: how long a result stays on screen before moving on / retrying (display only). */
+export const AUTO_NEXT_S = 6;
 
 export interface GateRow {
   id: "body" | "person" | "fps" | "seated" | "arms" | "standing";
@@ -81,6 +84,8 @@ export interface TestScreenProps {
   notice?: string;
   /** Auto-start is on (Settings): the test starts by itself once everything holds green. */
   autoStart?: boolean;
+  /** Auto-start: seconds until the app moves on (done) or retries (failed); null = not counting. */
+  autoLeft?: number | null;
   /** All gates green right now / held long enough to start. */
   allOk: boolean;
   gateReady: boolean;
@@ -231,7 +236,7 @@ export function TestScreen(p: TestScreenProps) {
 
       {phase === "position" && (
         <>
-          {p.autoStart ? <p className="note">{t.autoStartNote(GATES.autoStartHoldMs / 1000)}</p> : null}
+          {p.autoStart ? <p className="note">{t.autoStartNote}</p> : null}
           {p.camLine}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {p.rows.map((r) => (
@@ -280,6 +285,11 @@ export function TestScreen(p: TestScreenProps) {
 
       {phase === "failed" && (
         <>
+          {p.autoLeft != null ? (
+            <p className="callout" role="status">
+              {t.autoRetryIn(p.autoLeft)}
+            </p>
+          ) : null}
           {kind === "tug" ? (
             <TugResultCard t={t} result={null} reason={p.failMsg} />
           ) : (
@@ -301,6 +311,11 @@ export function TestScreen(p: TestScreenProps) {
 
       {phase === "done" && p.saved && (
         <>
+          {p.autoLeft != null ? (
+            <p className="note" role="status">
+              {t.autoNextIn(p.autoLeft)}
+            </p>
+          ) : null}
           <p className="muted">{t.autoMeasured}</p>
           {"totalSec" in p.saved ? (
             <TugResultCard t={t} result={p.saved} />

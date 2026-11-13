@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { STRINGS, type Lang } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
 import { CameraControls } from "@/components/CameraControls";
 import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
-import { cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
+import { AUTO_NEXT_S, cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
 import { playCue, playCueAndWait, stopCues, unlockAudio, type CueId } from "@/lib/voice";
 import { getAutoStart } from "@/lib/displayPrefs";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
@@ -20,7 +20,6 @@ import type { BalanceResult } from "@/lib/session";
 type Phase = "intro" | "position" | "running" | "aborted" | "failed" | "done";
 type StageView = "instr" | "wait" | "hold" | "held" | "moved";
 
-const GATE_HOLD_MS = 1500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function BalanceRunner({
@@ -79,7 +78,8 @@ export function BalanceRunner({
       if (f.gatesOk && s) {
         gateSince.current ??= f.t;
         setGateHeldMs(f.t - gateSince.current);
-        if (autoStartRef.current && f.t - gateSince.current >= GATES.autoStartHoldMs) void run();
+        // Auto-start: begin the moment Start would light up (same hold as the button).
+        if (autoStartRef.current && f.t - gateSince.current >= GATES.allGreenHoldMs) void run();
       } else {
         gateSince.current = null;
         setGateHeldMs(0);
@@ -108,6 +108,34 @@ export function BalanceRunner({
     setPhase("position");
     void cam.start("environment");
   };
+
+  // Auto-start: open the camera without the "Check position" tap.
+  useEffect(() => {
+    if (getAutoStart() === "on") openCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-start: after the result, go on to the results; after a failed run, try again.
+  const [autoLeft, setAutoLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!autoStartRef.current || (phase !== "done" && phase !== "failed")) {
+      setAutoLeft(null);
+      return;
+    }
+    let left = AUTO_NEXT_S;
+    setAutoLeft(left);
+    const id = setInterval(() => {
+      left -= 1;
+      setAutoLeft(left);
+      if (left <= 0) {
+        clearInterval(id);
+        if (phase === "done") onNext();
+        else openCamera();
+      }
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   /** Wait until pred() is true (or the test was stopped). */
   const waitFor = async (pred: () => boolean) => {
@@ -221,7 +249,8 @@ export function BalanceRunner({
     URL.revokeObjectURL(a.href);
   };
 
-  const gateReady = gateHeldMs >= GATE_HOLD_MS;
+  // Same hold as the Start button in the other tests (lib/signal/thresholds.ts).
+  const gateReady = gateHeldMs >= GATES.allGreenHoldMs;
   const remaining = Math.max(0, Math.ceil(HOLD_S - holdS));
 
   // Same gate rows as the other tests, with "standing" in place of "seated".
@@ -340,7 +369,7 @@ export function BalanceRunner({
 
       {phase === "position" && (
         <>
-          {autoStart ? <p className="note">{t.autoStartNote(GATES.autoStartHoldMs / 1000)}</p> : null}
+          {autoStart ? <p className="note">{t.autoStartNote}</p> : null}
           {cam.camera && <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} />}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {rows.map((r) => (
@@ -363,6 +392,11 @@ export function BalanceRunner({
 
       {phase === "failed" && (
         <>
+          {autoLeft != null ? (
+            <p className="callout" role="status">
+              {t.autoRetryStandIn(autoLeft)}
+            </p>
+          ) : null}
           <div className="card result">
             <StatusBadge kind="none">{t.badgeRefused}</StatusBadge>
             <p>{t.balLost}</p>
@@ -380,6 +414,11 @@ export function BalanceRunner({
 
       {phase === "done" && saved && (
         <>
+          {autoLeft != null ? (
+            <p className="note" role="status">
+              {t.autoResultsIn(autoLeft)}
+            </p>
+          ) : null}
           <p className="muted">{t.autoMeasured}</p>
           <div className="card result">
             <StatusBadge kind={saved.tandemHeld10 ? "ok" : "risk"}>

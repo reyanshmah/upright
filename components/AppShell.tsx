@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { STRINGS, type Lang } from "../lib/i18n";
 import { Icon } from "./Icon";
 import { SettingsSheet } from "./SettingsSheet";
+import { unlockAudio } from "../lib/voice";
 
 /**
  * Every screen: a quiet header (logo + name, one Settings button), one
@@ -35,6 +36,13 @@ export function AppShell({
   const t = STRINGS[lang];
   useEffect(() => {
     document.documentElement.lang = lang;
+  }, [lang]);
+  // iPhone plays sound only after a tap. Any tap on any screen unlocks it for
+  // the session, so Auto-start can speak without the "Check position" tap.
+  useEffect(() => {
+    const unlock = () => unlockAudio(lang);
+    document.addEventListener("pointerdown", unlock, { passive: true });
+    return () => document.removeEventListener("pointerdown", unlock);
   }, [lang]);
 
   return (
