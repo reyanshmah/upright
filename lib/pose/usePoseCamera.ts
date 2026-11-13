@@ -81,6 +81,12 @@ export interface FrameInfo {
   fpsOk: boolean;
   /** Smoothed: exactly one person in view. */
   personOk: boolean;
+  /**
+   * Smoothed: no SECOND person in view (0 or 1 people). This is what the
+   * one_person gate logs: losing the person is the body gate's job, so a
+   * tracking dropout is never reported as "more than one person".
+   */
+  noSecondPerson: boolean;
 }
 
 export interface Gates {
@@ -112,6 +118,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const bodyFlag = useRef(new StableFlag(GATES.body.onMs, GATES.body.offMs));
   const personFlag = useRef(new StableFlag(GATES.onePerson.onMs, GATES.onePerson.offMs));
   const fpsFlag = useRef(new StableFlag(GATES.fps.onMs, GATES.fps.offMs));
+  const secondFlag = useRef(new StableFlag(GATES.onePerson.onMs, GATES.onePerson.offMs));
   const lastMissing = useRef<BodyPart[]>([]);
   const upAcc = useRef<UpAccumulator>({ x: 0, y: 0 });
   const turnRef = useRef<Turn>(0);
@@ -208,6 +215,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
       // Smoothed gates: no flicker when a value hovers at its threshold.
       const bodyVisible = bodyFlag.current.update(missingNow.length === 0, t);
       const onePerson = personFlag.current.update(people.length === 1, t);
+      const noSecondPerson = secondFlag.current.update(people.length < 2, t);
       const fpsOk = fpsFlag.current.update(fps >= ALGO.minFps, t);
       if (bodyVisible || missingNow.length) lastMissing.current = bodyVisible ? [] : missingNow;
       const ok = fpsOk && onePerson && bodyVisible;
@@ -228,7 +236,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
         missing: lastMissing.current,
         ok,
       });
-      onFrameRef.current?.({ t, main, people: people.length, w: up.w, h: up.h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk, personOk: onePerson });
+      onFrameRef.current?.({ t, main, people: people.length, w: up.w, h: up.h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk, personOk: onePerson, noSecondPerson });
     }
     rafRef.current = requestAnimationFrame(loop);
   }, []);
@@ -259,6 +267,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
         bodyFlag.current.reset();
         personFlag.current.reset();
         fpsFlag.current.reset();
+        secondFlag.current.reset();
         lastMissing.current = [];
         if (!landmarkerRef.current) landmarkerRef.current = await createPoseLandmarker(variant);
         streamRef.current?.getTracks().forEach((t) => t.stop());

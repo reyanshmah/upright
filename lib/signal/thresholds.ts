@@ -71,7 +71,7 @@ export function scoreChairStand(count: number, armsUsed: boolean, age: number, s
  * in a detector). Bump CONFIG_VERSION on every change; thresholds freeze on
  * Nov 14 (v1.0), after that only bug fixes.
  */
-export const CONFIG_VERSION = "2026-11-12.1";
+export const CONFIG_VERSION = "2026-11-12.2";
 
 /** Algorithm constants shared by the live gates and the tests. */
 export const ALGO = {
@@ -114,6 +114,24 @@ export const FEATURES = {
   minShankPx: 5,
   /** Rolling window for the median shank length (samples; both legs add one per frame). */
   shankWindow: 120,
+  /**
+   * NEW Nov 12 (user-approved): if the median of the last shankRecentSamples
+   * differs from the window median by more than shankRescaleFrac, the person
+   * walked nearer to or farther from the camera, so the window restarts from
+   * the recent samples (otherwise the scale lags ~2.5 s and hip height reads
+   * ~20% high after walking back). Side views keep a steady shank: unchanged.
+   */
+  shankRecentSamples: 12,
+  shankRescaleFrac: 0.15,
+  /**
+   * NEW Nov 12 (user-approved): a frame whose own shank is more than this many
+   * times bigger or smaller than the current scale is not the same person (the
+   * model latched onto a pet or an object while the person was out of view),
+   * so it is ignored; if the new size holds for scaleJumpAcceptMs, it is
+   * accepted (the person came back at a different distance).
+   */
+  maxScaleJump: 2,
+  scaleJumpAcceptMs: 1_000,
   hipXFilter: { minCutoff: 1.5, beta: 0.01, dCutoff: 1 },
   hipHFilter: { minCutoff: 1.5, beta: 0.01, dCutoff: 1 },
   kneeFilter: { minCutoff: 1.5, beta: 0.02, dCutoff: 1 },
@@ -142,6 +160,12 @@ export const POSTURE = {
    * views never use this, so side-view results are unchanged.
    */
   frontalThighFrac: 0.6,
+  /**
+   * NEW Nov 12 (user-approved): a "seated" frame with the hip lower than this
+   * (shank lengths above the foot) is a bad detection (e.g. walking right past
+   * the camera), never a real seat (real seats read ~1.0-1.4).
+   */
+  seatedMinHipH: 0.7,
   /** Default time a posture must hold before it is accepted (ms). */
   holdMs: 150,
   /** In-between frames for longer than this (ms) break a posture run. */

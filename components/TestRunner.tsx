@@ -28,6 +28,7 @@ type Kind = "tug" | "chair";
 const AWAY_TINT = "#4da3ff";
 const BACK_TINT = "#c084fc";
 const TUG_TINT: Partial<Record<TugPhase, string>> = {
+  walk: AWAY_TINT,
   walkOut: AWAY_TINT,
   turn: AWAY_TINT,
   walkBack: BACK_TINT,
@@ -110,7 +111,7 @@ export function TestRunner({
     // Gate log: proof of which gates held, written into the typed result.
     if (p === "instructions" || p === "countdown" || p === "running") {
       gateLog.current.update("body", f.bodyOk, f.t);
-      gateLog.current.update("one_person", f.personOk, f.t);
+      gateLog.current.update("one_person", f.noSecondPerson, f.t);
       gateLog.current.update("fps", f.fpsOk, f.t);
     }
 

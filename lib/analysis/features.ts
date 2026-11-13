@@ -58,7 +58,7 @@ export type Posture = "SEATED" | "STANDING" | "BETWEEN";
  * walking step (the swing knee bends) still reads as standing.
  */
 export function classify(f: Feat): Posture {
-  if (kneeBent(f, POSTURE.seatedKneeDeg) && f.hipH < POSTURE.seatedHipH) return "SEATED";
+  if (kneeBent(f, POSTURE.seatedKneeDeg) && f.hipH < POSTURE.seatedHipH && f.hipH >= POSTURE.seatedMinHipH) return "SEATED";
   if (f.kneeDeg > POSTURE.standingKneeDeg && f.hipH > POSTURE.standingHipH) return "STANDING";
   return "BETWEEN";
 }
@@ -79,6 +79,9 @@ const LEGS = [
 
 export class FeatureExtractor {
   private shanks: number[] = [];
+  private recentShanks: number[] = [];
+  /** When frames started looking far too big or small for this person (ms), or null. */
+  private jumpSince: number | null = null;
   private fx = new OneEuroFilter(FEATURES.hipXFilter);
   private fhip = new OneEuroFilter(FEATURES.hipHFilter);
   private fknee = new OneEuroFilter(FEATURES.kneeFilter);
@@ -91,12 +94,34 @@ export class FeatureExtractor {
     const legs = LEGS.filter((l) => usable(lms[l.hip]) && usable(lms[l.knee]) && usable(lms[l.ankle]));
     if (!legs.length) return null;
 
-    for (const l of legs) {
-      const k = lms[l.knee], a = lms[l.ankle];
-      const len = Math.hypot((k.x - a.x) * W, (k.y - a.y) * H);
-      if (len > FEATURES.minShankPx) this.shanks.push(len);
+    const lens = legs
+      .map((l) => Math.hypot((lms[l.knee].x - lms[l.ankle].x) * W, (lms[l.knee].y - lms[l.ankle].y) * H))
+      .filter((len) => len > FEATURES.minShankPx);
+    // Several times bigger or smaller than a moment ago: not the same person
+    // (e.g. the model latched onto a pet while the person was out of view).
+    // Ignore it, unless the new size holds, then the person really moved.
+    if (lens.length && this.shanks.length) {
+      const ratio = median(lens) / median(this.shanks);
+      if (ratio > FEATURES.maxScaleJump || ratio < 1 / FEATURES.maxScaleJump) {
+        this.jumpSince ??= t;
+        if (t - this.jumpSince < FEATURES.scaleJumpAcceptMs) return null;
+        this.shanks = [];
+        this.recentShanks = [];
+      }
+      this.jumpSince = null;
+    }
+    for (const len of lens) {
+      this.shanks.push(len);
+      this.recentShanks.push(len);
     }
     while (this.shanks.length > FEATURES.shankWindow) this.shanks.shift();
+    while (this.recentShanks.length > FEATURES.shankRecentSamples) this.recentShanks.shift();
+    // Walked nearer to / farther from the camera: the long median lags behind
+    // the new size, so restart it from the recent samples.
+    if (this.shanks.length && this.recentShanks.length >= FEATURES.shankRecentSamples) {
+      const ratio = median(this.recentShanks) / median(this.shanks);
+      if (Math.abs(ratio - 1) > FEATURES.shankRescaleFrac) this.shanks = [...this.recentShanks];
+    }
     if (!this.shanks.length) return null;
     const shank = median(this.shanks);
 
@@ -176,7 +201,7 @@ export class PostureTracker {
     const base = this.seatedBase;
     if (raw === "BETWEEN" && base !== null) {
       if (f.hipH > base + POSTURE.relStandingRiseH && f.kneeDeg > POSTURE.relStandingKneeDeg) return "STANDING";
-      if (f.hipH < base + POSTURE.relSeatedRiseH && kneeBent(f, POSTURE.relSeatedKneeDeg)) return "SEATED";
+      if (f.hipH < base + POSTURE.relSeatedRiseH && f.hipH >= POSTURE.seatedMinHipH && kneeBent(f, POSTURE.relSeatedKneeDeg)) return "SEATED";
     }
     return raw;
   }

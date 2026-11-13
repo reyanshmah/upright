@@ -193,6 +193,7 @@ const en = {
   phaseNames: {
     waiting: "Ready",
     standUp: "Standing up",
+    walk: "Walking",
     walkOut: "Walking to the mark",
     turn: "Turning",
     walkBack: "Walking back",
@@ -564,6 +565,7 @@ const es: Strings = {
   phaseNames: {
     waiting: "Listo",
     standUp: "Levantándose",
+    walk: "Caminando",
     walkOut: "Caminando a la marca",
     turn: "Dando la vuelta",
     walkBack: "Regresando",

@@ -11,7 +11,8 @@
 import { FeatureExtractor, PostureTracker, classify, type Feat, type Posture } from "./features";
 import { TUG } from "../signal/thresholds";
 
-export type TugPhase = "waiting" | "standUp" | "walkOut" | "turn" | "walkBack" | "sitDown" | "done" | "failed";
+/** "walk" = walking, but not (yet) seen moving across the picture, so out vs back is unknown. */
+export type TugPhase = "waiting" | "standUp" | "walk" | "walkOut" | "turn" | "walkBack" | "sitDown" | "done" | "failed";
 
 export interface TugPhases {
   standUp: number;
@@ -105,6 +106,9 @@ export class TugDetector {
 
     // Live phase label
     if (!this.stood) this.phase = "standUp";
+    // Not yet far enough across the picture for a turn to count: the walk may be
+    // toward/away from the camera, where out and back look the same.
+    else if (!this.turned && this.maxD < TUG.minTurnD) this.phase = "walk";
     else if (!this.turned) {
       const v = this.speed();
       this.phase = this.maxD >= TUG.leftChair && d > TUG.turnNearMaxFrac * this.maxD && Math.abs(v) < TUG.turnSpeed ? "turn" : "walkOut";

@@ -9,12 +9,13 @@ import { lerp, stream } from "./synth";
  * up = 0 seated (thigh points at the lens, so it looks only 20 px long and the
  * knee looks straight), 1 standing (thigh 100 px, hip 200 px above the ankle).
  * `wide` = shoulders apart (facing the camera); false = shoulders overlap (side-on).
+ * `seatH` = seated hip height in shank lengths (real recordings: ~1.1-1.4).
  */
-function frontBody(cx: number, up: number, wide = true): Landmark[] {
+function frontBody(cx: number, up: number, wide = true, seatH = 1.2): Landmark[] {
   const W = 1000;
   const lm = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0.95 }));
   const set = (i: number, x: number, y: number) => (lm[i] = { x: x / W, y: y / W, z: 0, visibility: 0.95 });
-  const hipY = lerp(680, 600, up);
+  const hipY = lerp(800 - seatH * 100, 600, up);
   for (const [side, dx] of [[0, -25], [1, 25]] as const) {
     set(23 + side, cx + dx, hipY);
     set(25 + side, cx + dx, 700);
@@ -88,5 +89,65 @@ describe("chair stand filmed from the front", () => {
     const r = analyzeChairStand(stream(cycle, 31, 0.5))!;
     expect(r.count).toBe(12);
     expect(r.armsUsed).toBe(false);
+  });
+});
+
+/**
+ * Front-on person who walks AWAY from the camera and back: everything shrinks
+ * toward the horizon (y = 450) as they get farther. scale 1 = at the chair.
+ */
+function farBody(scale: number, up: number): Landmark[] {
+  // Seated hip at 1.35 shank lengths, close to the 1.45 cutoff, as in the recording.
+  return frontBody(500, up, true, 1.35).map((p) => ({
+    ...p,
+    x: 0.5 + (p.x - 0.5) * scale,
+    y: 0.45 + (p.y - 0.45) * scale,
+  }));
+}
+
+describe("walking toward / away from the camera (real failure, Nov 12 recording)", () => {
+  // Go 0.5 s; stand 1.0-1.5; walk away to 55% size by 4.5; stay far (turning, walking) until 6.5;
+  // walk back to full size by 8.0 and sit straight down 8.0-8.5, as in the recording.
+  const awayBack = (t: number) => {
+    const up = t < 1.0 ? 0 : t < 1.5 ? (t - 1.0) / 0.5 : t < 8.0 ? 1 : t < 8.5 ? 1 - (t - 8.0) / 0.5 : 0;
+    const scale = t < 1.5 ? 1 : t < 4.5 ? lerp(1, 0.55, (t - 1.5) / 3) : t < 6.5 ? 0.55 : t < 8.0 ? lerp(0.55, 1, (t - 6.5) / 1.5) : 1;
+    return farBody(scale, up);
+  };
+
+  it("sees the sit-down promptly after walking back (body size estimate keeps up)", () => {
+    const r = analyzeTug(stream(awayBack, 12, 0.5));
+    expect(r).not.toBeNull();
+    // Before the fix the size estimate lagged after walking back and the sit was seen late (8.3 s here, ~2 s late in the recording).
+    // True sit (hip below the seated cutoff) is at 8.42 s, Go at 0.5 s: 7.92 s. Within 0.2 s.
+    expect(r!.totalS).toBeGreaterThan(7.72);
+    expect(r!.totalS).toBeLessThan(8.12);
+  });
+
+  it("ignores a brief tiny figure (a pet) while the person is out of view: no fake turn", () => {
+    // Person leaves the picture 2.5-4.0 s; a small figure appears at the bottom for 0.25 s at 3.0 s.
+    const pet = (t: number): Landmark[] | null => {
+      if (t >= 2.5 && t < 4.0) {
+        if (t >= 3.0 && t < 3.25) return frontBody(200, 1).map((p) => ({ ...p, x: 0.2 + (p.x - 0.2) * 0.25, y: 0.9 + (p.y - 0.8) * 0.25 }));
+        return null;
+      }
+      return awayBack(t);
+    };
+    const s = stream((t) => pet(t) ?? frontBody(500, 1), 12, 0.5);
+    // Frames where nobody is in view carry no landmarks.
+    s.frames.forEach((f) => {
+      if (f.t / 1000 >= 2.5 && f.t / 1000 < 4.0 && !(f.t / 1000 >= 3.0 && f.t / 1000 < 3.25)) f.landmarks = null;
+    });
+    const r = analyzeTug(s);
+    expect(r).not.toBeNull();
+    // True sit (hip below the seated cutoff) is at 8.42 s, Go at 0.5 s: 7.92 s. Within 0.2 s.
+    expect(r!.totalS).toBeGreaterThan(7.72);
+    expect(r!.totalS).toBeLessThan(8.12);
+    // No lateral walk was filmed, so no phases (Total only) rather than phases built on the pet.
+    expect(r!.phases).toBeUndefined();
+  });
+
+  it("never treats an impossible 'hip below the knee' detection as seated", () => {
+    const f = featOf(frontBody(500, 0));
+    expect(classify({ ...f, hipH: 0.46 })).not.toBe("SEATED");
   });
 });
