@@ -3,19 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { LANGS, STRINGS, type Lang } from "../lib/i18n";
 import {
+  getAutoStart,
   getFontPref,
   getTextSize,
   getVoiceSpeedPref,
+  setAutoStart,
   setFontPref,
   setTextSize,
   setVoiceSpeedPref,
   VOICE_SPEEDS,
+  type AutoStart,
   type FontPref,
   type TextSize,
   type VoiceSpeed,
 } from "../lib/displayPrefs";
 import { getThemePref, setThemePref, type ThemePref } from "../lib/themePref";
 import { THEMES, type ThemeId } from "../lib/themes";
+import { GATES } from "../lib/signal/thresholds";
 
 /** Light and dark versions next to each other. */
 const THEME_ORDER: ThemeId[] = ["clinic-light", "clinic-dark", "signal-light", "signal-dark", "low-glare"];
@@ -42,6 +46,7 @@ export function SettingsSheet({
   const [font, setFont] = useState<FontPref>("standard");
   const [theme, setTheme] = useState<ThemePref>("auto");
   const [speed, setSpeed] = useState<VoiceSpeed>("1");
+  const [auto, setAuto] = useState<AutoStart>("off");
 
   useEffect(() => {
     const d = ref.current;
@@ -51,6 +56,7 @@ export function SettingsSheet({
       setFont(getFontPref());
       setTheme(getThemePref());
       setSpeed(getVoiceSpeedPref());
+      setAuto(getAutoStart());
       d.showModal();
     } else if (!open && d.open) d.close();
   }, [open]);
@@ -108,6 +114,23 @@ export function SettingsSheet({
               </span>
             </Option>
           ))}
+        </Group>
+
+        <Group legend={t.autoStartLabel}>
+          {(["off", "on"] as const).map((v) => (
+            <Option
+              key={v}
+              name="autostart"
+              checked={auto === v}
+              onSelect={() => {
+                setAutoStart(v);
+                setAuto(v);
+              }}
+            >
+              {v === "on" ? t.autoStartOn : t.autoStartOff}
+            </Option>
+          ))}
+          <p className="hint">{t.autoStartHint(GATES.autoStartHoldMs / 1000)}</p>
         </Group>
 
         <Group legend={t.voiceSpeedLabel}>

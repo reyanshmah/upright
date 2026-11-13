@@ -36,7 +36,8 @@ export type CueId =
   | "bal3"
   | "bal4"
   | "hold"
-  | "good";
+  | "good"
+  | "paused";
 
 let lastCueSource: "mp3" | "speech" | "unknown" = "unknown";
 /** How the most recent cue was produced (recorded in the session file). */
@@ -97,6 +98,36 @@ const TIMED: CueId[] = RECORDED;
 const PRELOAD: CueId[] = [...RECORDED, "tugInstr", "chairInstr", "balIntro", "hold", "good", "done"];
 
 type Clip = { buf: AudioBuffer; onsetMs: number };
+
+/** Everything playing or being waited on, so stopCues() can silence it at once. */
+const activeSources = new Set<AudioBufferSourceNode>();
+const waiters = new Set<() => void>();
+let activeEl: HTMLAudioElement | null = null;
+
+/**
+ * Stop every cue now (recorded clip, file or speech) and release anything
+ * waiting for one to finish. Used when the person leaves their position
+ * during the instructions or countdown.
+ */
+export function stopCues(): void {
+  for (const s of activeSources) {
+    try {
+      s.stop();
+    } catch {
+      /* already stopped */
+    }
+  }
+  activeSources.clear();
+  activeEl?.pause();
+  activeEl = null;
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {
+    /* no speech */
+  }
+  for (const w of [...waiters]) w();
+  waiters.clear();
+}
 const buffers = new Map<string, Promise<Clip | null>>();
 const slowed = new Map<string, Promise<AudioBuffer | null>>();
 
@@ -198,6 +229,8 @@ export async function playCue(lang: Lang, id: CueId, text: string): Promise<numb
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(output(ctx));
+      activeSources.add(src);
+      src.onended = () => activeSources.delete(src);
       const startedAt = performance.now();
       src.start();
       lastCueSource = "mp3";
@@ -234,11 +267,18 @@ export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs 
     if (buf) {
       const c = ctx;
       await new Promise<void>((resolve) => {
+        const done = () => {
+          activeSources.delete(src);
+          waiters.delete(done);
+          resolve();
+        };
         const src = c.createBufferSource();
         src.buffer = buf;
         src.connect(output(c));
-        src.onended = () => resolve();
-        setTimeout(resolve, Math.min(limit, buf.duration * 1000 + 1000));
+        src.onended = done;
+        activeSources.add(src);
+        waiters.add(done);
+        setTimeout(done, Math.min(limit, buf.duration * 1000 + 1000));
         src.start();
       });
       return;
@@ -249,20 +289,34 @@ export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs 
     audio.currentTime = 0;
     audio.volume = 1;
     audio.playbackRate = rate;
+    activeEl = audio;
     const played = await new Promise<boolean>((resolve) => {
-      audio.onended = () => resolve(true);
-      setTimeout(() => resolve(true), limit);
-      audio.play().catch(() => resolve(false));
+      const done = () => {
+        waiters.delete(done);
+        resolve(true);
+      };
+      waiters.add(done);
+      audio.onended = done;
+      setTimeout(done, limit);
+      audio.play().catch(() => {
+        waiters.delete(done);
+        resolve(false);
+      });
     });
     if (played) return;
   }
   await new Promise<void>((resolve) => {
-    try {
-      speak(lang, text, rate, () => resolve());
-      // Rough fallback if onend never fires: ~70 ms per character at normal speed.
-      setTimeout(resolve, Math.min(limit, (1500 + text.length * 70) / rate));
-    } catch {
+    const done = () => {
+      waiters.delete(done);
       resolve();
+    };
+    waiters.add(done);
+    try {
+      speak(lang, text, rate, done);
+      // Rough fallback if onend never fires: ~70 ms per character at normal speed.
+      setTimeout(done, Math.min(limit, (1500 + text.length * 70) / rate));
+    } catch {
+      done();
     }
   });
 }

@@ -8,7 +8,8 @@ import { CameraControls } from "@/components/CameraControls";
 import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
-import { playCue, playCueAndWait, unlockAudio, type CueId } from "@/lib/voice";
+import { playCue, playCueAndWait, stopCues, unlockAudio, type CueId } from "@/lib/voice";
+import { getAutoStart } from "@/lib/displayPrefs";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
 import { angleDeg } from "@/lib/signal/geometry";
 import { StableFlag } from "@/lib/signal/gate";
@@ -56,6 +57,9 @@ export function BalanceRunner({
   const frameOk = useRef({ ok: 0, total: 0 });
   const aborted = useRef(false);
   const stream = useRef<LandmarkStream | null>(null);
+  /** Settings > Start the test: automatically once standing has held green. */
+  const [autoStart, setAutoStartOn] = useState(false);
+  const autoStartRef = useRef(false);
 
   const onFrame = (f: FrameInfo) => {
     const p = phaseRef.current;
@@ -75,6 +79,7 @@ export function BalanceRunner({
       if (f.gatesOk && s) {
         gateSince.current ??= f.t;
         setGateHeldMs(f.t - gateSince.current);
+        if (autoStartRef.current && f.t - gateSince.current >= GATES.autoStartHoldMs) void run();
       } else {
         gateSince.current = null;
         setGateHeldMs(0);
@@ -91,7 +96,9 @@ export function BalanceRunner({
   const cam = usePoseCamera(onFrame);
 
   const openCamera = () => {
-    unlockAudio();
+    unlockAudio(lang);
+    autoStartRef.current = getAutoStart() === "on";
+    setAutoStartOn(autoStartRef.current);
     fx.current = null;
     gateSince.current = null;
     setGateHeldMs(0);
@@ -115,7 +122,9 @@ export function BalanceRunner({
   const st = (): string => det.current.status;
 
   const run = async () => {
-    unlockAudio();
+    if (phaseRef.current !== "position") return; // already started (auto-start fires on every frame)
+    phaseRef.current = "running";
+    unlockAudio(lang);
     aborted.current = false;
     det.current = new BalanceDetector();
     frameOk.current = { ok: 0, total: 0 };
@@ -198,7 +207,7 @@ export function BalanceRunner({
     aborted.current = true;
     cam.stopRecording();
     cam.stop();
-    window.speechSynthesis?.cancel();
+    stopCues();
     setPhase("aborted");
   };
 
@@ -331,6 +340,7 @@ export function BalanceRunner({
 
       {phase === "position" && (
         <>
+          {autoStart ? <p className="note">{t.autoStartNote(GATES.autoStartHoldMs / 1000)}</p> : null}
           {cam.camera && <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} />}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {rows.map((r) => (

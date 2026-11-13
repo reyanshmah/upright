@@ -57,3 +57,16 @@ export const getVoiceRate = (): number => Number(getVoiceSpeedPref());
 export function setVoiceSpeedPref(v: VoiceSpeed): void {
   write(VOICE_SPEED_KEY, v);
 }
+
+/**
+ * Auto-start: the test begins by itself once every check has been green for
+ * GATES.autoStartHoldMs, so someone testing alone does not have to reach for
+ * the phone after sitting down.
+ */
+export type AutoStart = "off" | "on";
+export const AUTO_START_KEY = "upright-autostart";
+export const AUTO_STARTS: readonly AutoStart[] = ["off", "on"];
+export const getAutoStart = () => read(AUTO_START_KEY, AUTO_STARTS, "off");
+export function setAutoStart(v: AutoStart): void {
+  write(AUTO_START_KEY, v);
+}

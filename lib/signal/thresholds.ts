@@ -71,7 +71,7 @@ export function scoreChairStand(count: number, armsUsed: boolean, age: number, s
  * in a detector). Bump CONFIG_VERSION on every change; thresholds freeze on
  * Nov 14 (v1.0), after that only bug fixes.
  */
-export const CONFIG_VERSION = "2026-11-12.2";
+export const CONFIG_VERSION = "2026-11-12.3";
 
 /** Algorithm constants shared by the live gates and the tests. */
 export const ALGO = {
@@ -92,6 +92,12 @@ export const GATES = {
   arms: { onMs: 400, offMs: 600 },
   /** Start stays disabled until every gate has been green this long. */
   allGreenHoldMs: 700,
+  /**
+   * NEW Nov 12 (user-approved): with Auto-start on (Settings), the test starts
+   * by itself once every gate has been green this long, so someone testing
+   * alone can sit down first without reaching for the phone.
+   */
+  autoStartHoldMs: 2_000,
   /** A second person in view longer than this (ms, inside the run) refuses the test. */
   secondPersonRefuseMs: 500,
   /** Whole-body gate off this long at the start or end of a TUG = person not visible there. */

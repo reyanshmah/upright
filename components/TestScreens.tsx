@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { STRINGS, type Lang, type Strings } from "../lib/i18n";
 import type { Gates } from "../lib/pose/usePoseCamera";
 import type { ChairEntry, TugEntry } from "../lib/session";
-import { ALGO, scoreChairStand, type Sex } from "../lib/signal/thresholds";
+import { ALGO, GATES, scoreChairStand, type Sex } from "../lib/signal/thresholds";
 import { AppShell, PinnedRow } from "./AppShell";
 import { SetupDiagram } from "./Diagram";
 import { StatusBadge } from "./StatusBadge";
@@ -77,6 +77,10 @@ export interface TestScreenProps {
   rows: GateRow[];
   /** Placement advice that does not block the start (e.g. phone upright for the TUG). */
   tips?: string[];
+  /** Why the start was paused (moved out of position), shown on the position screen. */
+  notice?: string;
+  /** Auto-start is on (Settings): the test starts by itself once everything holds green. */
+  autoStart?: boolean;
   /** All gates green right now / held long enough to start. */
   allOk: boolean;
   gateReady: boolean;
@@ -171,6 +175,13 @@ export function TestScreen(p: TestScreenProps) {
       {/* During the test the title shrinks so the timer and phase line stay above the pinned Stop. */}
       <h1 className={testing ? "h1 h1--compact" : "h1"}>{name}</h1>
 
+      {/* Why the start was paused: first thing on screen. */}
+      {phase === "position" && p.notice ? (
+        <p className="callout" role="alert">
+          {p.notice}
+        </p>
+      ) : null}
+
       {/* Setup: the gate sentence (first fix message) sits above the camera view. */}
       {phase === "position" && firstFailing ? <p className="live-status">{firstFailing.text}</p> : null}
 
@@ -220,6 +231,7 @@ export function TestScreen(p: TestScreenProps) {
 
       {phase === "position" && (
         <>
+          {p.autoStart ? <p className="note">{t.autoStartNote(GATES.autoStartHoldMs / 1000)}</p> : null}
           {p.camLine}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {p.rows.map((r) => (
@@ -239,6 +251,7 @@ export function TestScreen(p: TestScreenProps) {
       {phase === "instructions" && (
         <>
           <p className="live-status">{t.readingInstr}</p>
+          <p className="note">{t.stayPut}</p>
           <ol className="steps">
             {instr.map((s, i) => (
               <li key={i}>{s}</li>

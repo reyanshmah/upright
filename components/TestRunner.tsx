@@ -6,7 +6,8 @@ import { gateRows, TestScreen, type TestPhase } from "@/components/TestScreens";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
 import { CameraControls } from "@/components/CameraControls";
-import { getLastCueSource, playCue, playCueAndWait, unlockAudio } from "@/lib/voice";
+import { getLastCueSource, playCue, playCueAndWait, stopCues, unlockAudio } from "@/lib/voice";
+import { getAutoStart } from "@/lib/displayPrefs";
 import { buildChairResult, buildTugResult, tugMarkVisible, type RunContext } from "@/lib/analysis";
 import { FeatureExtractor, facingCamera } from "@/lib/analysis/features";
 import { TugDetector, type TugPhase } from "@/lib/analysis/tug";
@@ -75,6 +76,13 @@ export function TestRunner({
   /** The person faces the camera: the TUG walk can't be measured from the front. */
   const [frontal, setFrontal] = useState(false);
   const frontalFlag = useRef(new StableFlag(GATES.seated.onMs, GATES.seated.offMs));
+  /** Shown on the position screen, e.g. after the person moved during the instructions. */
+  const [notice, setNotice] = useState("");
+  /** Settings > Start the test: automatically once every check has held green. */
+  const [autoStart, setAutoStartOn] = useState(false);
+  const autoStartRef = useRef(false);
+  /** Bumped by every start and every interruption, so a stale start can't carry on. */
+  const runId = useRef(0);
 
   const phaseRef = useRef<Phase>("intro");
   phaseRef.current = phase;
@@ -122,19 +130,28 @@ export function TestRunner({
       setFrontal((was) => (was === fr ? was : fr));
     }
 
-    if (p === "position" || p === "instructions") {
+    if (p === "position" || p === "instructions" || p === "countdown") {
       const s = seatedFlag.current.update(isSeated, f.t);
       const a = kind === "chair" ? armsFlag.current.update(feat?.wristLow === false, f.t) : true;
-      if (p === "instructions") {
+      if (p !== "position") {
         gateLog.current.update("seated", s, f.t);
         if (kind === "chair") gateLog.current.update("arms", a, f.t);
       }
       setSeated(s);
       setArmsCrossed(a);
       const ok = f.gatesOk && s && a;
+      // Moved out of position (stood up, stepped out of view, a check went
+      // yellow) during the instructions or 3-2-1: pause the start instead of
+      // timing a run that began out of position. Flags are smoothed, so a
+      // brief flicker does not do this.
+      if (p !== "position" && !ok) {
+        interrupt();
+        return;
+      }
       if (ok) {
         gateSince.current ??= f.t;
         setGateHeldMs(f.t - gateSince.current);
+        if (p === "position" && autoStartRef.current && f.t - gateSince.current >= GATES.autoStartHoldMs) void begin();
       } else {
         gateSince.current = null;
         setGateHeldMs(0);
@@ -188,6 +205,9 @@ export function TestRunner({
 
   const openCamera = () => {
     unlockAudio(lang);
+    autoStartRef.current = getAutoStart() === "on";
+    setAutoStartOn(autoStartRef.current);
+    setNotice("");
     fx.current = null; // re-created on first frame with the right size
     gateSince.current = null;
     setGateHeldMs(0);
@@ -203,30 +223,52 @@ export function TestRunner({
     void cam.start("environment");
   };
 
+  /** The person left their position during the instructions or countdown: back to the check. */
+  const interrupt = () => {
+    runId.current++;
+    stopCues();
+    cam.stopRecording(); // the pre-roll is recorded again on the next start
+    phaseRef.current = "position";
+    gateSince.current = null;
+    setGateHeldMs(0);
+    setNotice(autoStartRef.current ? t.pausedAuto : t.pausedManual);
+    // Said out loud too: someone testing alone has walked away from the screen.
+    void playCue(lang, "paused", autoStartRef.current ? t.pausedSpokenAuto : t.pausedSpokenManual);
+    setPhase("position");
+  };
+
   const begin = async () => {
+    if (phaseRef.current !== "position") return; // already starting (auto-start fires on every frame)
+    const id = ++runId.current;
+    const live = (want: Phase) => runId.current === id && phaseRef.current === want;
+    phaseRef.current = "instructions";
     unlockAudio(lang);
     gateLog.current.reset();
     sessionFile.current = null;
     cam.startRecording(); // pre-roll: the chair position is learned before Go
     finishing.current = false;
+    setNotice("");
     setPhase("instructions");
     await playCueAndWait(lang, kind === "tug" ? "tugInstr" : "chairInstr", kind === "tug" ? t.tugSpoken : t.chairSpoken);
-    if (phaseRef.current !== "instructions") return;
+    if (!live("instructions")) return;
+    phaseRef.current = "countdown";
     setPhase("countdown");
     const ids = ["three", "two", "one"] as const;
     for (let i = 3; i >= 1; i--) {
       setCountdown(i);
       void playCue(lang, ids[3 - i], String(i));
       await new Promise((r) => setTimeout(r, 1000));
-      if ((phaseRef.current as Phase) !== "countdown") return;
+      if (!live("countdown")) return;
     }
     const go = await playCue(lang, "go", t.cueGo); // time zero
+    if (!live("countdown")) return;
     goT.current = go;
     tugDet.current!.setGo(go);
     chairDet.current!.setGo(go);
     setElapsed(0);
     setLiveCount(0);
     setLivePhase("standUp");
+    phaseRef.current = "running";
     setPhase("running");
   };
 
@@ -292,10 +334,11 @@ export function TestRunner({
   const abortRun = (reason: "aborted" | "tab_hidden") => {
     if (finishing.current) return;
     finishing.current = true;
+    runId.current++;
     const { frames, fpsMedian } = cam.stopRecording();
     const { w, h } = cam.videoSize();
     cam.stop();
-    window.speechSynthesis?.cancel();
+    stopCues();
     const st: LandmarkStream = {
       version: 1,
       sessionId: `s-${Date.now().toString(36)}-${kind}`,
@@ -377,6 +420,8 @@ export function TestRunner({
         cam.camera ? <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} /> : null
       }
       rows={rows}
+      notice={notice}
+      autoStart={autoStart}
       tips={kind === "tug" ? [...(frontal ? [t.tipSideView] : []), ...(portrait ? [t.tipTurnSideways] : [])] : []}
       allOk={rows.every((r) => r.ok)}
       gateReady={gateReady}
@@ -393,7 +438,7 @@ export function TestRunner({
       on={{
         check: openCamera,
         skip: onSkip,
-        backToIntro: () => { cam.stop(); setPhase("intro"); },
+        backToIntro: () => { runId.current++; stopCues(); cam.stop(); setPhase("intro"); },
         begin: () => void begin(),
         abort,
         redo,
