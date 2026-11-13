@@ -110,14 +110,20 @@ export class TugDetector {
       this.phase = this.maxD >= TUG.leftChair && d > TUG.turnNearMaxFrac * this.maxD && Math.abs(v) < TUG.turnSpeed ? "turn" : "walkOut";
     } else this.phase = d < TUG.backNear ? "sitDown" : "walkBack";
 
-    // End: a NEW sit-down (after standing and turning), back at the chair,
-    // held TUG.seatedFinalHoldMs. End time = the start of that seated run.
-    if (this.stood && this.turned && this.standT !== null) {
+    // End: a NEW sit-down after standing, back at the chair, held
+    // TUG.seatedFinalHoldMs. End time = the start of that seated run.
+    // Normally the turn must have been seen. If the walk wasn't visible from
+    // the side (camera facing the person, phone upright), sitting down after
+    // being up at least TUG.minAwayMs also ends it; phases() is then null, so
+    // the result is Total only.
+    if (this.stood && this.standT !== null) {
       if (raw === "SEATED") {
         if (this.sitRunSince === null || f.t - this.lastSitT > TUG.sitRunGapMs) this.sitRunSince = f.t;
         this.lastSitT = f.t;
       } else if (raw === "STANDING") this.sitRunSince = null;
+      const walkSeen = this.turned || (this.sitRunSince !== null && this.sitRunSince - this.standT >= TUG.minAwayMs);
       if (
+        walkSeen &&
         this.sitRunSince !== null &&
         this.sitRunSince > this.standT &&
         f.t - this.sitRunSince >= TUG.seatedFinalHoldMs &&
@@ -169,6 +175,8 @@ export class TugDetector {
   /** Five phases from the recorded series. Null if the boundaries don't line up. */
   phases(): TugPhases | null {
     if (this.goT === null || this.standT === null || this.endT === null) return null;
+    // No turn seen = the walk wasn't filmed from the side: no reliable phases.
+    if (!this.turned) return null;
     const after = this.feats.filter((x) => x.d !== null && x.f.t >= this.goT! && x.f.t <= this.endT!);
     if (after.length < TUG.phaseMinFrames) return null;
 

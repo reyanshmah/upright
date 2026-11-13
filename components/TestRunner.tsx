@@ -8,7 +8,7 @@ import { CameraStage } from "@/components/CameraStage";
 import { CameraControls } from "@/components/CameraControls";
 import { getLastCueSource, playCue, playCueAndWait, unlockAudio } from "@/lib/voice";
 import { buildChairResult, buildTugResult, tugMarkVisible, type RunContext } from "@/lib/analysis";
-import { FeatureExtractor } from "@/lib/analysis/features";
+import { FeatureExtractor, facingCamera } from "@/lib/analysis/features";
 import { TugDetector, type TugPhase } from "@/lib/analysis/tug";
 import { ChairDetector } from "@/lib/analysis/chair";
 import { GateLogger, StableFlag } from "@/lib/signal/gate";
@@ -71,6 +71,9 @@ export function TestRunner({
   const [abortNote, setAbortNote] = useState("");
   /** Upright (portrait) picture: the 3 m TUG walk won't fit across it. */
   const [portrait, setPortrait] = useState(false);
+  /** The person faces the camera: the TUG walk can't be measured from the front. */
+  const [frontal, setFrontal] = useState(false);
+  const frontalFlag = useRef(new StableFlag(GATES.seated.onMs, GATES.seated.offMs));
 
   const phaseRef = useRef<Phase>("intro");
   phaseRef.current = phase;
@@ -114,6 +117,8 @@ export function TestRunner({
     if (p === "position" && kind === "tug") {
       const tall = f.h > f.w;
       setPortrait((was) => (was === tall ? was : tall));
+      const fr = frontalFlag.current.update(!!feat && facingCamera(feat), f.t);
+      setFrontal((was) => (was === fr ? was : fr));
     }
 
     if (p === "position" || p === "instructions") {
@@ -190,6 +195,9 @@ export function TestRunner({
     setArmsCrossed(false);
     seatedFlag.current.reset();
     armsFlag.current.reset();
+    frontalFlag.current.reset();
+    setFrontal(false);
+    setPortrait(false);
     setPhase("position");
     void cam.start("environment");
   };
@@ -368,7 +376,7 @@ export function TestRunner({
         cam.camera ? <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} /> : null
       }
       rows={rows}
-      tips={kind === "tug" && portrait ? [t.tipTurnSideways] : []}
+      tips={kind === "tug" ? [...(frontal ? [t.tipSideView] : []), ...(portrait ? [t.tipTurnSideways] : [])] : []}
       allOk={rows.every((r) => r.ok)}
       gateReady={gateReady}
       countdown={countdown}

@@ -24,6 +24,30 @@ export interface Feat {
   shank: number; // px, rolling median
   /** true = a wrist is low (hands near thighs/chair), false = wrists high on chest, null = no wrist visible */
   wristLow: boolean | null;
+  /**
+   * Longest visible thigh (hip to knee) in shank lengths, as seen in the
+   * picture. About 1 from the side; much shorter when the person faces the
+   * camera with the knee bent toward it (sitting). Absent in old recordings.
+   */
+  thighFrac?: number;
+  /**
+   * Shoulder width / torso length as seen in the picture: small from the side
+   * (shoulders overlap), large when facing the camera. Absent if not visible.
+   */
+  shoulderFrac?: number;
+}
+
+/** The person faces the camera (shoulders look wide). */
+export function facingCamera(f: Feat): boolean {
+  return f.shoulderFrac !== undefined && f.shoulderFrac > POSTURE.frontalShoulderFrac;
+}
+
+/**
+ * Knee bent past `deg`, or (facing the camera) bent toward the lens: then the
+ * knee looks straight in the picture but the thigh looks very short.
+ */
+function kneeBent(f: Feat, deg: number): boolean {
+  return f.kneeDeg < deg || (facingCamera(f) && f.thighFrac !== undefined && f.thighFrac < POSTURE.frontalThighFrac);
 }
 
 export type Posture = "SEATED" | "STANDING" | "BETWEEN";
@@ -34,7 +58,7 @@ export type Posture = "SEATED" | "STANDING" | "BETWEEN";
  * walking step (the swing knee bends) still reads as standing.
  */
 export function classify(f: Feat): Posture {
-  if (f.kneeDeg < POSTURE.seatedKneeDeg && f.hipH < POSTURE.seatedHipH) return "SEATED";
+  if (kneeBent(f, POSTURE.seatedKneeDeg) && f.hipH < POSTURE.seatedHipH) return "SEATED";
   if (f.kneeDeg > POSTURE.standingKneeDeg && f.hipH > POSTURE.standingHipH) return "STANDING";
   return "BETWEEN";
 }
@@ -87,6 +111,8 @@ export class FeatureExtractor {
     const hipX = this.fx.filter(((lh.x + rh.x) / 2) * W, ts);
     const hipH = this.fhip.filter((ankleY - hipY) / shank, ts);
     const kneeDeg = this.fknee.filter(kneeRaw, ts);
+    const thighFrac =
+      Math.max(...legs.map((l) => Math.hypot((lms[l.hip].x - lms[l.knee].x) * W, (lms[l.hip].y - lms[l.knee].y) * H))) / shank;
 
     // Wrists: crossed on the chest = high on the torso; pushing off = low.
     const shY = ((lms[LM.leftShoulder].y + lms[LM.rightShoulder].y) / 2) * H;
@@ -99,7 +125,16 @@ export class FeatureExtractor {
       wristLow = wristLow === true ? true : low;
     }
 
-    return { t, hipX, hipH, kneeDeg, shank, wristLow };
+    // Facing the camera or side-on: shoulder width against torso length.
+    let shoulderFrac: number | undefined;
+    const ls = lms[LM.leftShoulder], rs = lms[LM.rightShoulder];
+    if (usable(ls) && usable(rs) && usable(lh) && usable(rh)) {
+      const sw = Math.hypot((ls.x - rs.x) * W, (ls.y - rs.y) * H);
+      const tl = Math.hypot(((ls.x + rs.x) / 2 - (lh.x + rh.x) / 2) * W, ((ls.y + rs.y) / 2 - (lh.y + rh.y) / 2) * H);
+      if (tl > 0) shoulderFrac = sw / tl;
+    }
+
+    return { t, hipX, hipH, kneeDeg, shank, wristLow, thighFrac, ...(shoulderFrac !== undefined ? { shoulderFrac } : {}) };
   }
 }
 
@@ -141,7 +176,7 @@ export class PostureTracker {
     const base = this.seatedBase;
     if (raw === "BETWEEN" && base !== null) {
       if (f.hipH > base + POSTURE.relStandingRiseH && f.kneeDeg > POSTURE.relStandingKneeDeg) return "STANDING";
-      if (f.hipH < base + POSTURE.relSeatedRiseH && f.kneeDeg < POSTURE.relSeatedKneeDeg) return "SEATED";
+      if (f.hipH < base + POSTURE.relSeatedRiseH && kneeBent(f, POSTURE.relSeatedKneeDeg)) return "SEATED";
     }
     return raw;
   }

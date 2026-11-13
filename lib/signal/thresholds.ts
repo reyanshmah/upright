@@ -71,7 +71,7 @@ export function scoreChairStand(count: number, armsUsed: boolean, age: number, s
  * in a detector). Bump CONFIG_VERSION on every change; thresholds freeze on
  * Nov 14 (v1.0), after that only bug fixes.
  */
-export const CONFIG_VERSION = "2026-11-11.1";
+export const CONFIG_VERSION = "2026-11-12.1";
 
 /** Algorithm constants shared by the live gates and the tests. */
 export const ALGO = {
@@ -128,6 +128,20 @@ export const POSTURE = {
   seatedHipH: 1.45,
   standingKneeDeg: 140,
   standingHipH: 1.55,
+  /**
+   * NEW Nov 12 (user-approved): the person faces the camera when shoulder
+   * width / torso length (as seen in the picture) is above this. From the side
+   * the shoulders overlap (~0-0.3); facing the camera ~0.7-0.9.
+   * Used by the seated check below and by the TUG "film from the side" tip.
+   */
+  frontalShoulderFrac: 0.5,
+  /**
+   * NEW Nov 12 (user-approved): only when facing the camera, a thigh shorter
+   * than this (shank lengths, as seen in the picture) counts as a bent knee for
+   * the seated check (the knee points at the lens and looks straight). Side
+   * views never use this, so side-view results are unchanged.
+   */
+  frontalThighFrac: 0.6,
   /** Default time a posture must hold before it is accepted (ms). */
   holdMs: 150,
   /** In-between frames for longer than this (ms) break a posture run. */
@@ -181,6 +195,12 @@ export const TUG = {
   phaseMinFrames: 10,
   /** TUG >= this many seconds: the app suggests skipping the chair stand for safety. */
   verySlowS: 20,
+  /**
+   * NEW Nov 12 (user-approved): when the walk was not seen from the side (no
+   * turn detected), sitting back down still ends the test if they were up at
+   * least this long (ms). Such a run has no phases, so it is Total only.
+   */
+  minAwayMs: 3_000,
 } as const;
 
 /**
