@@ -12,6 +12,7 @@ import { playCue, playCueAndWait, unlockAudio, type CueId } from "@/lib/voice";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
 import { angleDeg } from "@/lib/signal/geometry";
 import { StableFlag } from "@/lib/signal/gate";
+import { BALANCE, GATES } from "@/lib/signal/thresholds";
 import { LM, type LandmarkStream, type PoseFrame } from "@/lib/signal/types";
 import type { BalanceResult } from "@/lib/session";
 
@@ -49,7 +50,8 @@ export function BalanceRunner({
   phaseRef.current = phase;
   const fx = useRef<FrontFeatures | null>(null);
   const det = useRef(new BalanceDetector());
-  const standFlag = useRef(new StableFlag(400, 600));
+  // Same on/off hold as the seated check in the other tests.
+  const standFlag = useRef(new StableFlag(GATES.seated.onMs, GATES.seated.offMs));
   const gateSince = useRef<number | null>(null);
   const frameOk = useRef({ ok: 0, total: 0 });
   const aborted = useRef(false);
@@ -66,7 +68,7 @@ export function BalanceRunner({
         const m = f.main;
         const kl = angleDeg(m[LM.leftHip], m[LM.leftKnee], m[LM.leftAnkle], f.w, f.h);
         const kr = angleDeg(m[LM.rightHip], m[LM.rightKnee], m[LM.rightAnkle], f.w, f.h);
-        up = kl > 150 && kr > 150;
+        up = kl > BALANCE.standKneeDeg && kr > BALANCE.standKneeDeg;
       }
       const s = standFlag.current.update(up, f.t);
       setStanding(s);

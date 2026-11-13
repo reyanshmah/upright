@@ -100,6 +100,12 @@ export const GATES = {
   chairMaxBodyOffFrac: 0.1,
 } as const;
 
+/** 4-Stage Balance position check (components/BalanceRunner.tsx). */
+export const BALANCE = {
+  /** Both knees straighter than this (deg) = standing, ready to start. */
+  standKneeDeg: 150,
+} as const;
+
 /** Per-frame features (lib/analysis/features.ts). */
 export const FEATURES = {
   /** Landmark counts as usable above this visibility and inside the image. */

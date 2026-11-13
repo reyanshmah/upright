@@ -62,6 +62,29 @@ async function tryAudio(lang: Lang, id: CueId): Promise<HTMLAudioElement | null>
  */
 const RECORDED: CueId[] = ["three", "two", "one", "go", "stop"];
 let ctx: AudioContext | null = null;
+
+/*
+ * Loudness: recorded cues go through a gain stage into a compressor, so they
+ * play louder than the file without harsh clipping. Speech (browser voice)
+ * can't go above volume 1, so it is set to the maximum.
+ */
+const CUE_GAIN = 2.5;
+let out: AudioNode | null = null;
+function output(c: AudioContext): AudioNode {
+  if (out && out.context === c) return out;
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -12;
+  comp.knee.value = 6;
+  comp.ratio.value = 12;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.15;
+  const gain = c.createGain();
+  gain.gain.value = CUE_GAIN;
+  gain.connect(comp);
+  comp.connect(c.destination);
+  out = gain;
+  return out;
+}
 const buffers = new Map<string, Promise<{ buf: AudioBuffer; onsetMs: number } | null>>();
 
 function loadBuffer(lang: Lang, id: CueId) {
@@ -120,7 +143,7 @@ export async function playCue(lang: Lang, id: CueId, text: string): Promise<numb
     if (b) {
       const src = ctx.createBufferSource();
       src.buffer = b.buf;
-      src.connect(ctx.destination);
+      src.connect(output(ctx));
       const startedAt = performance.now();
       src.start();
       lastCueSource = "mp3";
@@ -132,6 +155,7 @@ export async function playCue(lang: Lang, id: CueId, text: string): Promise<numb
   if (audio) {
     lastCueSource = "mp3";
     audio.currentTime = 0;
+    audio.volume = 1;
     await audio.play().catch(() => undefined);
     return performance.now();
   }
@@ -142,6 +166,7 @@ export async function playCue(lang: Lang, id: CueId, text: string): Promise<numb
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang === "es" ? "es-US" : "en-US";
     u.rate = 0.95;
+    u.volume = 1;
     synth.speak(u);
   } catch {
     /* no speech available; the on-screen cue still shows */
@@ -154,6 +179,7 @@ export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs 
   const audio = await tryAudio(lang, id);
   if (audio) {
     audio.currentTime = 0;
+    audio.volume = 1;
     await new Promise<void>((resolve) => {
       const done = () => resolve();
       audio.onended = done;
@@ -169,6 +195,7 @@ export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs 
       const u = new SpeechSynthesisUtterance(text);
       u.lang = lang === "es" ? "es-US" : "en-US";
       u.rate = 0.95;
+      u.volume = 1;
       u.onend = () => resolve();
       u.onerror = () => resolve();
       synth.speak(u);
