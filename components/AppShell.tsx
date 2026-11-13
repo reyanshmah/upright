@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { STRINGS, type Lang } from "../lib/i18n";
 import { Icon } from "./Icon";
 import { SettingsSheet } from "./SettingsSheet";
@@ -16,15 +16,22 @@ export function AppShell({
   onLang,
   pinned,
   disclaimer,
+  scrollKey,
   children,
 }: {
   lang: Lang;
   onLang: (l: Lang) => void;
   pinned?: ReactNode;
   disclaimer?: ReactNode;
+  /** When this changes (e.g. a test moves to its next phase), the content scrolls back to the top. */
+  scrollKey?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const scrollRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (scrollKey !== undefined) scrollRef.current?.scrollTo({ top: 0 });
+  }, [scrollKey]);
   const t = STRINGS[lang];
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -48,7 +55,7 @@ export function AppShell({
           <span>{t.settings}</span>
         </button>
       </header>
-      <main className="app__scroll">
+      <main className="app__scroll" ref={scrollRef}>
         {children}
         <footer className="disclaimer">{disclaimer ?? <p>{t.disclaimer}</p>}</footer>
       </main>

@@ -7,18 +7,23 @@ import { useEffect, useState, type CSSProperties, type RefObject, type ReactNode
  * camera's own shape (read from the video each time it changes, e.g. after a
  * switch between the wide and normal lens), so the picture fills it exactly
  * and the skeleton lines up. Tall pictures are capped in height and centered.
+ * The hook draws each frame onto the canvas (on top), so picture and skeleton
+ * always match; the <video> underneath only shows until the first frame.
  */
 export function CameraStage({
   videoRef,
   canvasRef,
   overlay,
   mirror = false,
+  maxHeight = "62dvh",
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   overlay?: ReactNode;
   /** Front camera: show it like a mirror (video and skeleton together). */
   mirror?: boolean;
+  /** Tallest the box may be (CSS length); the width shrinks to keep the camera's shape. */
+  maxHeight?: string;
 }) {
   const [ratio, setRatio] = useState<number | null>(null);
 
@@ -38,8 +43,8 @@ export function CameraStage({
   }, [videoRef]);
 
   const style: CSSProperties | undefined = ratio
-    ? { aspectRatio: String(ratio), width: `min(100%, calc(62dvh * ${ratio.toFixed(4)}))` }
-    : undefined;
+    ? { aspectRatio: String(ratio), width: `min(100%, calc(${maxHeight} * ${ratio.toFixed(4)}))` }
+    : { width: `min(100%, calc(${maxHeight} * 0.75))` };
 
   return (
     <div className={mirror ? "stage stage--mirror" : "stage"} style={style}>

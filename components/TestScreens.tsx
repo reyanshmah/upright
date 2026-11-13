@@ -75,6 +75,8 @@ export interface TestScreenProps {
   /** Camera label + "try another camera", shown during the gate check. */
   camLine: ReactNode;
   rows: GateRow[];
+  /** Placement advice that does not block the start (e.g. phone upright for the TUG). */
+  tips?: string[];
   /** All gates green right now / held long enough to start. */
   allOk: boolean;
   gateReady: boolean;
@@ -164,7 +166,7 @@ export function TestScreen(p: TestScreenProps) {
   }
 
   return (
-    <AppShell lang={p.lang} onLang={p.onLang} pinned={pinned}>
+    <AppShell lang={p.lang} onLang={p.onLang} pinned={pinned} scrollKey={phase}>
       <p className="eyebrow">{t.testOf(n)}</p>
       {/* During the test the title shrinks so the timer and phase line stay above the pinned Stop. */}
       <h1 className={testing ? "h1 h1--compact" : "h1"}>{name}</h1>
@@ -226,6 +228,11 @@ export function TestScreen(p: TestScreenProps) {
               </li>
             ))}
           </ul>
+          {p.tips?.map((tip) => (
+            <p key={tip} className="callout">
+              {tip}
+            </p>
+          ))}
         </>
       )}
 

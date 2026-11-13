@@ -275,7 +275,7 @@ export function BalanceRunner({
   }
 
   return (
-    <AppShell lang={lang} onLang={onLang} pinned={pinned}>
+    <AppShell lang={lang} onLang={onLang} pinned={pinned} scrollKey={phase}>
       <p className="eyebrow">{t.testOf(3)}</p>
       <h1 className={phase === "running" ? "h1 h1--compact" : "h1"}>{t.balName}</h1>
 
@@ -303,7 +303,7 @@ export function BalanceRunner({
         <>
           {cam.status === "loading" ? <p className="muted">{t.loadingCamera}</p> : null}
           {cam.error ? <StatusBadge kind="risk">{cameraErrorText(cam.error, t)}</StatusBadge> : null}
-          <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} mirror={cam.facing === "user"} overlay={null} />
+          <CameraStage videoRef={cam.videoRef} canvasRef={cam.canvasRef} mirror={cam.facing === "user"} maxHeight={phase === "position" ? "55dvh" : "40dvh"} overlay={null} />
         </>
       ) : null}
 

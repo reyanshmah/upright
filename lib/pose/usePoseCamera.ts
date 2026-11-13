@@ -148,7 +148,12 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     [stop],
   );
 
-  const draw = (people: Landmark[][], w: number, h: number, ok: boolean) => {
+  /**
+   * Draws the camera frame AND the skeleton on one canvas, so the picture
+   * always fills the box and the skeleton always lines up with the body
+   * (iOS can render a live <video> smaller than its box).
+   */
+  const draw = (video: HTMLVideoElement, people: Landmark[][], w: number, h: number, ok: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (canvas.width !== w || canvas.height !== h) {
@@ -157,6 +162,11 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     }
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, w, h);
+    try {
+      ctx.drawImage(video, 0, 0, w, h);
+    } catch {
+      /* frame not ready: the <video> underneath still shows */
+    }
     people.forEach((lms, p) => {
       ctx.strokeStyle = p > 0 ? "#ff5a4e" : !ok ? "#ffd23f" : tintRef.current ?? "#3ee08f";
       ctx.lineWidth = Math.max(3, w / 200);
@@ -210,7 +220,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
         fpsLog.current.push(fps);
       }
 
-      draw(people, w, h, ok);
+      draw(video, people, w, h, ok);
       setGates({
         fps: fpsOk ? Math.max(fps, ALGO.minFps) : Math.min(fps, ALGO.minFps - 0.1),
         people: onePerson ? 1 : people.length === 1 ? 0 : people.length,

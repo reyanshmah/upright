@@ -69,6 +69,8 @@ export function TestRunner({
   const [failMsg, setFailMsg] = useState("");
   const [saved, setSaved] = useState<TugEntry | ChairEntry | null>(null);
   const [abortNote, setAbortNote] = useState("");
+  /** Upright (portrait) picture: the 3 m TUG walk won't fit across it. */
+  const [portrait, setPortrait] = useState(false);
 
   const phaseRef = useRef<Phase>("intro");
   phaseRef.current = phase;
@@ -107,6 +109,11 @@ export function TestRunner({
       gateLog.current.update("body", f.bodyOk, f.t);
       gateLog.current.update("one_person", f.personOk, f.t);
       gateLog.current.update("fps", f.fpsOk, f.t);
+    }
+
+    if (p === "position" && kind === "tug") {
+      const tall = f.h > f.w;
+      setPortrait((was) => (was === tall ? was : tall));
     }
 
     if (p === "position" || p === "instructions") {
@@ -350,6 +357,8 @@ export function TestRunner({
           videoRef={cam.videoRef}
           canvasRef={cam.canvasRef}
           mirror={cam.facing === "user"}
+          // During the test the box is shorter so the timer and phase line stay on screen.
+          maxHeight={phase === "position" ? "55dvh" : "40dvh"}
           overlay={phase === "countdown" ? <div className="big-readout" aria-hidden>{countdown}</div> : null}
         />
       }
@@ -359,6 +368,7 @@ export function TestRunner({
         cam.camera ? <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} /> : null
       }
       rows={rows}
+      tips={kind === "tug" && portrait ? [t.tipTurnSideways] : []}
       allOk={rows.every((r) => r.ok)}
       gateReady={gateReady}
       countdown={countdown}
