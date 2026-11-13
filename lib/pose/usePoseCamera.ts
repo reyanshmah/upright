@@ -9,6 +9,7 @@ import { StableFlag } from "../signal/gate";
 import { ALGO, GATES } from "../signal/thresholds";
 import type { Landmark, PoseFrame } from "../signal/types";
 import { toRecorded } from "../signal/privacy";
+import { accumulateUp, turnOf, uprightLandmarks, uprightSize, type Turn, type UpAccumulator } from "./orientation";
 
 export type Facing = "environment" | "user";
 
@@ -112,6 +113,10 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const personFlag = useRef(new StableFlag(GATES.onePerson.onMs, GATES.onePerson.offMs));
   const fpsFlag = useRef(new StableFlag(GATES.fps.onMs, GATES.fps.offMs));
   const lastMissing = useRef<BodyPart[]>([]);
+  const upAcc = useRef<UpAccumulator>({ x: 0, y: 0 });
+  const turnRef = useRef<Turn>(0);
+  /** Optional skeleton color for the main person (e.g. by test phase); null = gate colors. */
+  const tintRef = useRef<string | null>(null);
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
@@ -128,6 +133,9 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     keepScreenOn(false);
+    // Never leave the last run's green checks on screen.
+    setGates(NO_GATES);
+    tintRef.current = null;
     setStatus((s) => (s === "error" ? s : "idle"));
   }, []);
 
@@ -150,7 +158,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, w, h);
     people.forEach((lms, p) => {
-      ctx.strokeStyle = p > 0 ? "#ff5a4e" : ok ? "#3ee08f" : "#ffd23f";
+      ctx.strokeStyle = p > 0 ? "#ff5a4e" : !ok ? "#ffd23f" : tintRef.current ?? "#3ee08f";
       ctx.lineWidth = Math.max(3, w / 200);
       for (const [a, b] of SKELETON_EDGES) {
         if (lms[a].visibility < 0.3 || lms[b].visibility < 0.3) continue;
@@ -179,7 +187,13 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
       while (ft.length && t - ft[0] > 1000) ft.shift();
       const fps = ft.length > 1 ? ((ft.length - 1) * 1000) / (t - ft[0]) : 0;
 
-      const main = people[0] ?? null;
+      const raw = people[0] ?? null;
+      // Rotation lock / upside-down phone: analyse an upright copy of the landmarks.
+      accumulateUp(upAcc.current, raw, w, h, ALGO.minVisibility);
+      const turn = turnOf(upAcc.current);
+      turnRef.current = turn;
+      const main = raw ? uprightLandmarks(raw, turn) : null;
+      const up = uprightSize(w, h, turn);
       const missingNow: BodyPart[] = main ? missingParts(main, ALGO.minVisibility) : ["hips", "knees", "feet"];
       // Smoothed gates: no flicker when a value hovers at its threshold.
       const bodyVisible = bodyFlag.current.update(missingNow.length === 0, t);
@@ -204,7 +218,7 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
         missing: lastMissing.current,
         ok,
       });
-      onFrameRef.current?.({ t, main, people: people.length, w, h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk, personOk: onePerson });
+      onFrameRef.current?.({ t, main, people: people.length, w: up.w, h: up.h, fps, gatesOk: ok, bodyOk: bodyVisible, fpsOk, personOk: onePerson });
     }
     rafRef.current = requestAnimationFrame(loop);
   }, []);
@@ -227,6 +241,15 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
           throw err;
         }
         setStatus("loading");
+        setGates(NO_GATES);
+        upAcc.current = { x: 0, y: 0 };
+        turnRef.current = 0;
+        lastVideoTime.current = -1;
+        frameTimes.current = [];
+        bodyFlag.current.reset();
+        personFlag.current.reset();
+        fpsFlag.current.reset();
+        lastMissing.current = [];
         if (!landmarkerRef.current) landmarkerRef.current = await createPoseLandmarker(variant);
         streamRef.current?.getTracks().forEach((t) => t.stop());
 
@@ -313,10 +336,13 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     return { frames, fpsMedian: f.length ? f[Math.floor(f.length / 2)] : null };
   }, []);
 
-  const videoSize = () => ({
-    w: videoRef.current?.videoWidth ?? 0,
-    h: videoRef.current?.videoHeight ?? 0,
-  });
+  /** Size of the analysed (upright) frame. */
+  const videoSize = () =>
+    uprightSize(videoRef.current?.videoWidth ?? 0, videoRef.current?.videoHeight ?? 0, turnRef.current);
+
+  const setTint = useCallback((c: string | null) => {
+    tintRef.current = c;
+  }, []);
 
   return {
     videoRef,
@@ -333,5 +359,6 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     startRecording,
     stopRecording,
     videoSize,
+    setTint,
   };
 }

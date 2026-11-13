@@ -19,6 +19,20 @@ import { saveRun } from "@/lib/store";
 import { GATES, type Sex } from "@/lib/signal/thresholds";
 
 type Kind = "tug" | "chair";
+
+/**
+ * Skeleton color while the test runs, so it is clear on screen whether the
+ * person has left the chair and whether they are on the way back.
+ * Green (default) = at the chair; blue = walking away / turning; purple = coming back.
+ */
+const AWAY_TINT = "#4da3ff";
+const BACK_TINT = "#c084fc";
+const TUG_TINT: Partial<Record<TugPhase, string>> = {
+  walkOut: AWAY_TINT,
+  turn: AWAY_TINT,
+  walkBack: BACK_TINT,
+  sitDown: BACK_TINT,
+};
 type Phase = TestPhase;
 
 export function TestRunner({
@@ -116,10 +130,12 @@ export function TestRunner({
 
     if (p === "running") {
       if (kind === "tug") {
+        cam.setTint(TUG_TINT[tr.phase] ?? null);
         setLivePhase(tr.phase);
         if (tr.done) void finish();
         else if (tr.phase === "failed") void finish();
       } else {
+        cam.setTint(chairDet.current!.seatedNow ? null : AWAY_TINT);
         setLiveCount(cr.count);
         if (cr.done) void finish();
       }
@@ -162,6 +178,11 @@ export function TestRunner({
     fx.current = null; // re-created on first frame with the right size
     gateSince.current = null;
     setGateHeldMs(0);
+    // A redo starts from nothing: no stale "seated" / "arms" checks.
+    setSeated(false);
+    setArmsCrossed(false);
+    seatedFlag.current.reset();
+    armsFlag.current.reset();
     setPhase("position");
     void cam.start("environment");
   };

@@ -93,6 +93,9 @@ export function BalanceRunner({
     fx.current = null;
     gateSince.current = null;
     setGateHeldMs(0);
+    // A redo starts from nothing: no stale "standing" check.
+    setStanding(false);
+    standFlag.current.reset();
     setPhase("position");
     void cam.start("environment");
   };
