@@ -2,7 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LANGS, STRINGS, type Lang } from "../lib/i18n";
-import { getFontPref, getTextSize, setFontPref, setTextSize, type FontPref, type TextSize } from "../lib/displayPrefs";
+import {
+  getFontPref,
+  getTextSize,
+  getVoiceSpeedPref,
+  setFontPref,
+  setTextSize,
+  setVoiceSpeedPref,
+  VOICE_SPEEDS,
+  type FontPref,
+  type TextSize,
+  type VoiceSpeed,
+} from "../lib/displayPrefs";
 import { getThemePref, setThemePref, type ThemePref } from "../lib/themePref";
 import { THEMES, type ThemeId } from "../lib/themes";
 
@@ -30,6 +41,7 @@ export function SettingsSheet({
   const [text, setText] = useState<TextSize>("standard");
   const [font, setFont] = useState<FontPref>("standard");
   const [theme, setTheme] = useState<ThemePref>("auto");
+  const [speed, setSpeed] = useState<VoiceSpeed>("1");
 
   useEffect(() => {
     const d = ref.current;
@@ -38,6 +50,7 @@ export function SettingsSheet({
       setText(getTextSize());
       setFont(getFontPref());
       setTheme(getThemePref());
+      setSpeed(getVoiceSpeedPref());
       d.showModal();
     } else if (!open && d.open) d.close();
   }, [open]);
@@ -95,6 +108,23 @@ export function SettingsSheet({
               </span>
             </Option>
           ))}
+        </Group>
+
+        <Group legend={t.voiceSpeedLabel}>
+          {VOICE_SPEEDS.map((v) => (
+            <Option
+              key={v}
+              name="voice-speed"
+              checked={speed === v}
+              onSelect={() => {
+                setVoiceSpeedPref(v);
+                setSpeed(v);
+              }}
+            >
+              {t.voiceSpeedNames[v]}
+            </Option>
+          ))}
+          <p className="hint">{t.voiceSpeedHint}</p>
         </Group>
 
         <Group legend={t.themeLabel}>

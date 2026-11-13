@@ -40,3 +40,20 @@ export function setFontPref(v: FontPref): void {
   write(FONT_KEY, v);
   document.documentElement.dataset.font = v;
 }
+
+/**
+ * Voice speed for the read-aloud instructions and short cues (accessibility).
+ * The 3-2-1 / Go / Stop cues always play at normal speed, because Go is the
+ * test's time zero.
+ */
+export type VoiceSpeed = "1" | "0.75" | "0.5";
+export const VOICE_SPEED_KEY = "upright-voice-speed";
+export const VOICE_SPEEDS: readonly VoiceSpeed[] = ["1", "0.75", "0.5"];
+
+export const getVoiceSpeedPref = () => read(VOICE_SPEED_KEY, VOICE_SPEEDS, "1");
+/** The speed as a number (1 = normal, 0.5 = half speed). */
+export const getVoiceRate = (): number => Number(getVoiceSpeedPref());
+
+export function setVoiceSpeedPref(v: VoiceSpeed): void {
+  write(VOICE_SPEED_KEY, v);
+}

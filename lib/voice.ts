@@ -2,14 +2,20 @@
 
 import type { Lang } from "./i18n";
 import { audibleOnsetMs } from "./audioOnset";
+import { getVoiceRate } from "./displayPrefs";
+import { timeStretch } from "./timeStretch";
 
 /**
- * Voice cues. Recorded EN/ES cues for 3-2-1, Go and Stop live in
- * public/audio/<lang>/<id>.mp3 (cut from the ElevenLabs takes; each file starts
- * ~15 ms before the word). They play through Web Audio and the "go" cue is time
- * zero. Every other cue (instructions, "done") still uses the browser's speech,
- * which starts after a variable, unmeasured delay; an <id>.mp3 dropped into
- * public/audio is picked up by the HTMLAudio fallback below.
+ * Voice cues. Recorded EN/ES clips live in public/audio/<lang>/<id>.mp3:
+ * 3-2-1, Go and Stop (the "go" cue is time zero), plus the spoken instructions
+ * (tugInstr, chairInstr, balIntro) and the short words (hold, good, done).
+ * All recorded clips play through Web Audio (unlocked in the Start tap, so
+ * they play on iPhone and get the loudness boost). If a clip is missing, the
+ * browser's speech reads the same text.
+ *
+ * Voice speed (Settings) slows the instructions and short words without
+ * lowering the pitch. 3-2-1, Go and Stop always play at normal speed so the
+ * time zero stays exact.
  */
 export type CueId =
   | "ready"
@@ -85,13 +91,20 @@ function output(c: AudioContext): AudioNode {
   out = gain;
   return out;
 }
-const buffers = new Map<string, Promise<{ buf: AudioBuffer; onsetMs: number } | null>>();
+/** Cues whose timing matters: always normal speed. */
+const TIMED: CueId[] = RECORDED;
+/** Clips preloaded in the Start tap (all recorded files the screens use). */
+const PRELOAD: CueId[] = [...RECORDED, "tugInstr", "chairInstr", "balIntro", "hold", "good", "done"];
+
+type Clip = { buf: AudioBuffer; onsetMs: number };
+const buffers = new Map<string, Promise<Clip | null>>();
+const slowed = new Map<string, Promise<AudioBuffer | null>>();
 
 function loadBuffer(lang: Lang, id: CueId) {
   const key = `${lang}/${id}`;
   if (!buffers.has(key)) {
     const p = (async () => {
-      if (!ctx || !RECORDED.includes(id)) return null;
+      if (!ctx) return null;
       try {
         const res = await fetch(`/audio/${key}.mp3`);
         if (!res.ok) return null;
@@ -105,6 +118,32 @@ function loadBuffer(lang: Lang, id: CueId) {
     buffers.set(key, p);
   }
   return buffers.get(key)!;
+}
+
+/** The clip at the chosen speed (slowed copies are made once and kept). */
+function bufferAt(lang: Lang, id: CueId, rate: number): Promise<AudioBuffer | null> {
+  if (rate >= 0.999 || TIMED.includes(id)) return loadBuffer(lang, id).then((b) => b?.buf ?? null);
+  const key = `${lang}/${id}@${rate}`;
+  if (!slowed.has(key)) {
+    slowed.set(
+      key,
+      loadBuffer(lang, id).then(async (b) => {
+        if (!b || !ctx) return null;
+        await new Promise((r) => setTimeout(r, 0)); // let the page paint first
+        const chans = Array.from({ length: b.buf.numberOfChannels }, (_, i) => b.buf.getChannelData(i));
+        const outCh = timeStretch(chans, b.buf.sampleRate, rate);
+        const out = ctx.createBuffer(outCh.length, outCh[0].length, b.buf.sampleRate);
+        outCh.forEach((c, i) => out.copyToChannel(new Float32Array(c), i));
+        return out;
+      }),
+    );
+  }
+  return slowed.get(key)!;
+}
+
+/** Speed for a cue: the setting for instructions/short words, normal for timed cues. */
+function rateFor(id: CueId): number {
+  return TIMED.includes(id) ? 1 : getVoiceRate();
 }
 
 /** Call from a button tap: unlocks speech and Web Audio (iOS) and preloads the cues. */
@@ -125,11 +164,25 @@ export function unlockAudio(lang?: Lang): void {
       src.buffer = ctx.createBuffer(1, 1, 22050);
       src.connect(ctx.destination);
       src.start(0);
-      if (lang) for (const id of RECORDED) void loadBuffer(lang, id);
+      if (lang) for (const id of PRELOAD) void bufferAt(lang, id, rateFor(id));
     }
   } catch {
     ctx = null;
   }
+}
+
+function speak(lang: Lang, text: string, rate: number, onEnd?: () => void): void {
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang === "es" ? "es-US" : "en-US";
+  u.rate = 0.95 * rate;
+  u.volume = 1;
+  if (onEnd) {
+    u.onend = onEnd;
+    u.onerror = onEnd;
+  }
+  synth.speak(u);
 }
 
 /**
@@ -138,69 +191,76 @@ export function unlockAudio(lang?: Lang): void {
  * file, i.e. when the word is actually heard (see MASTER.md "Cue timing").
  */
 export async function playCue(lang: Lang, id: CueId, text: string): Promise<number> {
+  const rate = rateFor(id);
   if (ctx && ctx.state === "running") {
-    const b = await loadBuffer(lang, id);
-    if (b) {
+    const [clip, buf] = await Promise.all([loadBuffer(lang, id), bufferAt(lang, id, rate)]);
+    if (clip && buf) {
       const src = ctx.createBufferSource();
-      src.buffer = b.buf;
+      src.buffer = buf;
       src.connect(output(ctx));
       const startedAt = performance.now();
       src.start();
       lastCueSource = "mp3";
       const latencyMs = ((ctx as AudioContext & { outputLatency?: number }).outputLatency || ctx.baseLatency || 0) * 1000;
-      return startedAt + latencyMs + b.onsetMs;
+      return startedAt + latencyMs + clip.onsetMs / rate;
     }
   }
   const audio = await tryAudio(lang, id);
   if (audio) {
-    lastCueSource = "mp3";
     audio.currentTime = 0;
     audio.volume = 1;
-    await audio.play().catch(() => undefined);
-    return performance.now();
+    audio.playbackRate = rate;
+    const ok = await audio.play().then(() => true, () => false);
+    if (ok) {
+      lastCueSource = "mp3";
+      return performance.now();
+    }
   }
   lastCueSource = "speech";
   try {
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === "es" ? "es-US" : "en-US";
-    u.rate = 0.95;
-    u.volume = 1;
-    synth.speak(u);
+    speak(lang, text, rate);
   } catch {
     /* no speech available; the on-screen cue still shows */
   }
   return performance.now();
 }
 
-/** Speaks/plays a cue and resolves when it has finished (max `maxMs`). */
+/** Speaks/plays a cue and resolves when it has finished (max `maxMs` at normal speed). */
 export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs = 15000): Promise<void> {
+  const rate = rateFor(id);
+  const limit = maxMs / rate;
+  if (ctx && ctx.state === "running") {
+    const buf = await bufferAt(lang, id, rate);
+    if (buf) {
+      const c = ctx;
+      await new Promise<void>((resolve) => {
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        src.connect(output(c));
+        src.onended = () => resolve();
+        setTimeout(resolve, Math.min(limit, buf.duration * 1000 + 1000));
+        src.start();
+      });
+      return;
+    }
+  }
   const audio = await tryAudio(lang, id);
   if (audio) {
     audio.currentTime = 0;
     audio.volume = 1;
-    await new Promise<void>((resolve) => {
-      const done = () => resolve();
-      audio.onended = done;
-      setTimeout(done, maxMs);
-      audio.play().catch(done);
+    audio.playbackRate = rate;
+    const played = await new Promise<boolean>((resolve) => {
+      audio.onended = () => resolve(true);
+      setTimeout(() => resolve(true), limit);
+      audio.play().catch(() => resolve(false));
     });
-    return;
+    if (played) return;
   }
   await new Promise<void>((resolve) => {
     try {
-      const synth = window.speechSynthesis;
-      synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = lang === "es" ? "es-US" : "en-US";
-      u.rate = 0.95;
-      u.volume = 1;
-      u.onend = () => resolve();
-      u.onerror = () => resolve();
-      synth.speak(u);
-      // Rough fallback if onend never fires: ~70 ms per character.
-      setTimeout(resolve, Math.min(maxMs, 1500 + text.length * 70));
+      speak(lang, text, rate, () => resolve());
+      // Rough fallback if onend never fires: ~70 ms per character at normal speed.
+      setTimeout(resolve, Math.min(limit, (1500 + text.length * 70) / rate));
     } catch {
       resolve();
     }
