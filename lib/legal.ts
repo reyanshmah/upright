@@ -11,7 +11,7 @@ import type { Lang } from "./i18n";
 
 export const LEGAL_ENTITY = "Upright Inc.";
 export const LEGAL_EFFECTIVE = { en: "November 14, 2026", es: "14 de noviembre de 2026" } as const;
-export const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL ?? "";
+export const LEGAL_EMAIL = process.env.NEXT_PUBLIC_LEGAL_EMAIL ?? "aaronhanqin@gmail.com";
 
 export interface LegalSection {
   h: string;
