@@ -44,6 +44,8 @@ export async function POST(req: Request): Promise<Response> {
       source: result.source,
       lang: result.lang,
       rejectedAttempts: result.rejected.length,
+      // Checker messages only (no results or names): lets a failing deploy be diagnosed from the browser.
+      ...(result.rejected.length ? { rejectedReasons: result.rejected.map((r) => r.slice(0, 8).map((x) => x.slice(0, 200))) } : {}),
       ...(result.modelError ? { modelError: result.modelError } : {}),
     },
     { headers: { "cache-control": "no-store" } },
