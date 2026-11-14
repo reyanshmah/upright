@@ -23,14 +23,14 @@ const STANCE_STABLE_MS = 800;
 const STANCE_GRACE_MS = 15_000;
 /**
  * A foot counts as moved only if its SMOOTHED position (median of the last
- * 300 ms) is > 0.25 shank lengths (~10 cm) from where it was at the start of
- * the hold (median of the first 400 ms), and stays that way for 300 ms.
+ * 500 ms) is > 0.55 shank lengths (~22 cm) from where it was at the start of
+ * the hold (median of the first 500 ms), and stays that way for 500 ms.
  * Single-frame jitter and brief tracking glitches don't end the hold.
  */
-const MOVE_SCALE = 0.25;
-const MOVE_MS = 300;
-const REF_MS = 400;
-const WIN_MS = 300;
+const MOVE_SCALE = 0.55;
+const MOVE_MS = 450;
+const REF_MS = 500;
+const WIN_MS = 450;
 const FOOT_VIS = 0.5;
 /** Moving within the first second of a hold = still settling in: restart the hold. */
 const SETTLE_MS = 1000;
