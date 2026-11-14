@@ -46,6 +46,8 @@ Upright is a phone-only CDC STEADI fall-risk screen (Timed Up and Go + 30-Second
 
 **Backend:** `POST /api/report` (guards in `lib/reportgen/guard.ts`: 20 KB cap read as a stream, same-site Origin check, per-address rate limit) and `GET /api/health`. The results page builds the request with `lib/reportgen/clientInput.ts` (numbers and an age band only) and shows the model's plan only when the server says it passed the checks; offline or on failure it keeps the on-device plan. The report request includes the balance test and walking aid; the writer gets per-person `focus` and `personalNotes` (`lib/report.ts` `planContext` / `stepDetail`), and the on-device plan is personalised the same way. The results footnote says why the standard plan is shown (no key / failed checks / error); `GET /api/health` reports `reportWriter: configured | missing_api_key`.
 
+**Exercises:** `lib/exercises.ts` picks fixed, approved exercises from the results (CDC chair rise for weak legs / a slow walk; practice of the balance position they could not hold) and the results screen shows them under the plan with safety lines (ask the doctor first when risk is higher). The AI writer never writes exercise steps (`FACTS.exercises` only names them).
+
 **Balance test:** front or ~45° view; feet are compared as a gap vector scaled by shank length, so the helper's phone may move. A position starts once the feet have changed from the previous position and settled; positions are spoken aloud (the person can't see the screen).
 
 ## Rules for changes (from MASTER.md)

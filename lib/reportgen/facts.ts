@@ -4,6 +4,7 @@
  * logs and fps are full of numbers it must never repeat), and the number check
  * allows only these values, in the exact string form the engine shows them.
  */
+import { exercisesFor } from "../exercises";
 import { focusAreas, stepDetail, stepOrder, type Focus, type PlanContext, type ReportFacts, type StepKey } from "../report";
 import { bandAge } from "../sessionFile";
 import { chairStandNorm, scoreChairStand, TUG_RISK_SECONDS } from "../signal/thresholds";
@@ -54,6 +55,8 @@ export interface WriterFacts {
   higherRisk: boolean;
   /** What this person's plan should focus on, from their own results. */
   focus: Focus[];
+  /** The exercises the app shows under the plan (fixed text; the writer must not describe routines). */
+  exercises: string[];
   /** The family plan steps, in order. */
   stepOrder: StepKey[];
   /** One note per step tying it to this person's results (in the FACTS language). */
@@ -164,6 +167,7 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
     walkingAid: input.walkingAid ?? null,
     higherRisk: reportFacts.higherRisk,
     focus: focusAreas(ctx),
+    exercises: exercisesFor(ctx, input.lang).cards.map((c) => c.id),
     stepOrder: order,
     personalNotes,
   };

@@ -2,6 +2,7 @@
 
 import { STRINGS, type Lang } from "../lib/i18n";
 import { chairMeasured, isSkipped, tugMeasured, type SessionState } from "../lib/session";
+import { exercisesFor } from "../lib/exercises";
 import { exerciseTitle, planContext, reportFacts, stepDetail, stepOrder, STEP_TEXT } from "../lib/report";
 import { TUG_RISK_SECONDS } from "../lib/signal/thresholds";
 import { AppShell } from "./AppShell";
@@ -26,6 +27,9 @@ const R = {
     skipped: "Skipped",
     yesAnswers: (n: number) => (n === 1 ? "1 yes answer" : `${n} yes answers`),
     planTitle: "Family action plan",
+    exTitle: "Exercises for you",
+    exSub: "Picked from today's results. Do them with someone nearby.",
+    exSafety: "Before you start",
     clinicianTitle: "Clinician summary",
     clinicianNote: "Print or save this page as a PDF and bring it to the next doctor visit.",
     print: "Print / save clinician summary",
@@ -45,6 +49,9 @@ const R = {
     skipped: "Omitida",
     yesAnswers: (n: number) => (n === 1 ? "1 respuesta sí" : `${n} respuestas sí`),
     planTitle: "Plan de acción para la familia",
+    exTitle: "Ejercicios para usted",
+    exSub: "Elegidos según los resultados de hoy. Hágalos con alguien cerca.",
+    exSafety: "Antes de empezar",
     clinicianTitle: "Resumen para el médico (en inglés)",
     clinicianNote: "Imprima o guarde esta página como PDF y llévela a la próxima cita.",
     print: "Imprimir / guardar el resumen",
@@ -80,6 +87,7 @@ export function ResultsView({
   const f = reportFacts(s);
   const steps = stepOrder(f);
   const ctx = planContext(s);
+  const exPlan = exercisesFor(ctx, lang);
   const yesCount = [s.screening.unsteady, s.screening.worry, s.screening.fallen].filter(Boolean).length;
   const tug = tugMeasured(s.tug);
   const chair = chairMeasured(s.chair);
@@ -200,6 +208,37 @@ export function ResultsView({
                 );
               })}
         </ol>
+        <section className="exercises" aria-labelledby="exercises-h">
+          <h3 className="h2" id="exercises-h">
+            {r.exTitle}
+          </h3>
+          <p className="muted">{r.exSub}</p>
+          <div className="callout">
+            <b>{r.exSafety}</b>
+            <ul>
+              {exPlan.safety.map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          </div>
+          {exPlan.cards.map((c) => (
+            <article className="card exercise" key={c.id}>
+              <h4>{c.title}</h4>
+              <p className="plan-detail">
+                <b>{t.planForYou}</b> {c.why}
+              </p>
+              <ol>
+                {c.steps.map((st, i) => (
+                  <li key={i}>{st}</li>
+                ))}
+              </ol>
+              <p>
+                <b>{c.dose}</b>
+              </p>
+              {c.easier && <p className="muted">{c.easier}</p>}
+            </article>
+          ))}
+        </section>
         {(plan.state !== "standard" || plan.reason) && (
           <p className="footnote" aria-live="polite">
             <Icon name={plan.state === "loading" ? "clock" : "info"} size={20} />

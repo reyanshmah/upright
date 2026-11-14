@@ -597,3 +597,9 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
 .measure-app .btn { margin-top: var(--sp-2); }
 /* Settings: live preview of the text size, font and spacing. */
 .sheet__sample { margin: 0; padding: var(--sp-3) var(--sp-4); background: var(--card); border: var(--card-bw) solid var(--line); border-left: 6px solid var(--info-bd); border-radius: var(--radius); font-size: var(--fs-lead); }
+
+/* Results: exercises under the family plan */
+.exercises { margin-top: var(--sp-4); display: grid; gap: var(--sp-3); }
+.exercise h4 { font-size: var(--fs-lead); margin: 0 0 var(--sp-1); }
+.exercise ol { margin: var(--sp-2) 0; padding-left: 1.4em; display: grid; gap: var(--sp-1); }
+.exercises .callout ul { margin: var(--sp-1) 0 0; padding-left: 1.2em; }

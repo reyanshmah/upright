@@ -141,3 +141,28 @@ describe("why the standard plan was used", () => {
     expect(unsafe.rejected.length).toBe(2);
   });
 });
+
+describe("exercises for this person (Nov 14)", () => {
+  it("picks chair rise for weak legs, the failed stance for balance, and both languages exist", async () => {
+    const { exercisesFor } = await import("../lib/exercises");
+    const base: PlanContext = {
+      screening: { unsteady: false, worry: false, fallen: false, fallCount: null, injured: null },
+      walkingAid: "none", tugSec: "9.8", tugAtRisk: false, chairScore: "13", chairNorm: "12", chairBelow: false, armsUsed: false,
+      balance: { tandemHeld10: true, failedStage: null, failedHeldSec: null },
+    };
+    const legs = exercisesFor({ ...base, chairScore: "8", chairBelow: true }, "en");
+    expect(legs.cards.map((c) => c.id)).toEqual(["chair_rise"]);
+    expect(legs.cards[0].why).toContain("8 times");
+    expect(legs.cards[0].dose).toContain("10 to 15");
+    const bal = exercisesFor({ ...base, balance: { tandemHeld10: false, failedStage: 3, failedHeldSec: "6.4" } }, "en");
+    expect(bal.cards.map((c) => c.id)).toContain("balance_3");
+    expect(bal.cards.find((c) => c.id === "balance_3")!.why).toContain("position 3 for 6.4 seconds");
+    expect(bal.safety.join(" ")).toContain("physical therapist");
+    const good = exercisesFor(base, "es");
+    expect(good.cards[0].id).toBe("chair_rise");
+    expect(good.safety.join(" ")).not.toContain("fisioterapeuta");
+    const both = exercisesFor({ ...base, armsUsed: true, balance: { tandemHeld10: false, failedStage: 2, failedHeldSec: "4.0" }, walkingAid: "walker" }, "en");
+    expect(both.cards.map((c) => c.id)).toEqual(["chair_rise", "balance_2"]);
+    expect(both.safety.join(" ")).toContain("walker");
+  });
+});
