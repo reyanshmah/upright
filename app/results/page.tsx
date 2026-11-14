@@ -49,12 +49,14 @@ export default function Results() {
           report: ReportOutput;
           source: "model" | "regenerated" | "template";
           rejectedAttempts?: number;
+          modelError?: string;
         };
         if (cancelled) return;
         updateSession({ reportSource: body.source });
         // Only a checked model plan replaces the on-device one; the server template matches it.
         if (body.source !== "template" && body.report?.familySteps?.length) setPlan({ state: "ai", output: body.report });
-        // Say why: a template with no rejected drafts means the server has no API key.
+        // Say why: the API call failed (with its error kind), the drafts failed the checks, or there is no key.
+        else if (body.modelError) setPlan({ state: "standard", reason: "api", detail: body.modelError });
         else setPlan({ state: "standard", reason: (body.rejectedAttempts ?? 0) > 0 ? "checks" : "no_key" });
       })
       .catch(() => {

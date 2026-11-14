@@ -116,3 +116,28 @@ describe("different people get different plans", () => {
     expect(JSON.stringify(a.personalNotes)).not.toEqual(JSON.stringify(b.personalNotes));
   });
 });
+
+describe("why the standard plan was used", () => {
+  it("an API failure is reported with its kind, a checker failure is not", async () => {
+    const { generateReport } = await import("../lib/reportgen/generate");
+    const input = load(files[0]);
+    class AuthenticationError extends Error {
+      status = 401;
+      name = "AuthenticationError";
+    }
+    const bad = await generateReport(input, async () => {
+      throw new AuthenticationError("invalid x-api-key");
+    });
+    expect(bad.source).toBe("template");
+    expect(bad.modelError).toBe("AuthenticationError (401)");
+
+    const unsafe = await generateReport(input, async () => ({
+      familySummary: "You have a disease. Take 5 mg.",
+      familySteps: [{ title: "x", body: "y" }],
+      clinicianSummary: "z",
+    }));
+    expect(unsafe.source).toBe("template");
+    expect(unsafe.modelError).toBeUndefined();
+    expect(unsafe.rejected.length).toBe(2);
+  });
+});

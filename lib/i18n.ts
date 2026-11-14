@@ -371,6 +371,7 @@ const en = {
   reportNoKey: "Standard plan: the AI plan writer isn't set up on this server (no API key).",
   reportChecks: "Standard plan: the AI's drafts didn't pass the safety and number checks, so they weren't shown.",
   reportError: "Standard plan: the AI plan writer couldn't be reached.",
+  reportApi: (why: string) => `Standard plan: the AI plan writer returned an error (${why}).`,
   planForYou: "For you:",
 
   // Setup diagram
@@ -826,6 +827,7 @@ const es: Strings = {
   reportNoKey: "Plan estándar: el redactor de planes con IA no está configurado en este servidor (falta la clave de API).",
   reportChecks: "Plan estándar: los borradores de la IA no pasaron las revisiones de seguridad y de números, así que no se mostraron.",
   reportError: "Plan estándar: no se pudo conectar con el redactor de planes con IA.",
+  reportApi: (why: string) => `Plan estándar: el redactor de planes con IA devolvió un error (${why}).`,
   planForYou: "Para usted:",
 
   diaAltTug: "Vista desde arriba: la silla contra la pared, un recorrido de 3 m hasta una marca de cinta y de regreso, y el teléfono en un soporte a 2 o 3 m de lado, con la vista de la cámara cubriendo la silla y la marca",

@@ -20,7 +20,16 @@ export interface ReportResult {
   source: ReportSource;
   /** Why the model's attempts were rejected (empty when the first attempt passed). */
   rejected: string[][];
+  /** Set when every failed attempt was the API call itself (bad key, model not found, timeout...). */
+  modelError?: string;
   lang: "en" | "es";
+}
+
+/** "AuthenticationError (401)": the error class and HTTP status only, never the request or the key. */
+export function describeModelError(e: unknown): string {
+  if (!(e instanceof Error)) return "error";
+  const status = (e as { status?: unknown }).status;
+  return typeof status === "number" ? `${e.name} (${status})` : e.name;
 }
 
 /** Total time budget for the model path (MASTER.md: 15 s). */
@@ -35,7 +44,15 @@ export async function generateReport(
 ): Promise<ReportResult> {
   const { facts, allowed } = writerFacts(input);
   const rejected: string[][] = [];
-  const template = (): ReportResult => ({ report: templateReport(facts), source: "template", rejected, lang: facts.lang });
+  let modelError: string | undefined;
+  let checkFailed = false;
+  const template = (): ReportResult => ({
+    report: templateReport(facts),
+    source: "template",
+    rejected,
+    ...(modelError && !checkFailed ? { modelError } : {}),
+    lang: facts.lang,
+  });
   if (!callModel) return template();
 
   const deadline = now() + REPORT_TIMEOUT_MS;
@@ -46,11 +63,13 @@ export async function generateReport(
     try {
       const out = await callModel({ system: SYSTEM_PROMPT, user: userMessage(facts, rejected[attempt - 1]), timeoutMs: left });
       problems = out ? checkReport(out, facts, allowed) : ["no usable output (refusal or unparseable)"];
+      checkFailed = true;
       if (out && !problems.length) {
         return { report: out, source: attempt === 0 ? "model" : "regenerated", rejected, lang: facts.lang };
       }
     } catch (e) {
-      problems = [`model call failed: ${e instanceof Error ? e.name : "error"}`];
+      modelError = describeModelError(e);
+      problems = [`model call failed: ${modelError}`];
     }
     rejected.push(problems);
   }

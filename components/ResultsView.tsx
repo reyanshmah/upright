@@ -58,7 +58,7 @@ const R = {
 export type PlanState =
   | { state: "loading" }
   | { state: "ai"; output: ReportOutput }
-  | { state: "standard"; reason?: "no_key" | "checks" | "error" }
+  | { state: "standard"; reason?: "no_key" | "checks" | "error" | "api"; detail?: string }
   | { state: "offline" };
 
 export function ResultsView({
@@ -214,7 +214,9 @@ export function ResultsView({
                       ? t.reportNoKey
                       : plan.reason === "checks"
                         ? t.reportChecks
-                        : t.reportError}
+                        : plan.reason === "api"
+                          ? t.reportApi(plan.detail ?? "")
+                          : t.reportError}
             </span>
           </p>
         )}

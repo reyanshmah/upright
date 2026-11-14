@@ -10,6 +10,8 @@ import { MAX_BODY_BYTES, validateReportInput } from "../../../lib/reportgen/sche
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** The model path has a 15 s budget; give the function room so Vercel doesn't cut it off first. */
+export const maxDuration = 30;
 
 /** A family opens results once or twice (and maybe switches language): 20 a minute is plenty. */
 const limited = makeRateLimiter(20, 60_000);
@@ -32,12 +34,17 @@ export async function POST(req: Request): Promise<Response> {
   if (!v.ok) return Response.json({ error: "invalid results JSON", details: v.errors }, { status: 400 });
 
   const result = await generateReport(v.input, anthropicCaller());
+  // Shows in Vercel > Logs. Only error kinds and checker reasons: no results, names or key.
+  if (result.source === "template" && result.rejected.length) {
+    console.error("[report] standard plan used:", result.modelError ?? "", JSON.stringify(result.rejected));
+  }
   return Response.json(
     {
       report: result.report,
       source: result.source,
       lang: result.lang,
       rejectedAttempts: result.rejected.length,
+      ...(result.modelError ? { modelError: result.modelError } : {}),
     },
     { headers: { "cache-control": "no-store" } },
   );
