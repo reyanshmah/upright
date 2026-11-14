@@ -18,6 +18,7 @@ const clampErr = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)
 export function buildReportInput(s: SessionState): ReportInput {
   const tug = s.tug;
   const chair = s.chair;
+  const bal = s.balance;
   return {
     schemaVersion: 1,
     lang: s.lang,
@@ -59,5 +60,14 @@ export function buildReportInput(s: SessionState): ReportInput {
             medianFps: chair.medianFps,
             gateLog: gates(chair.gateLog),
           },
+    balance: !bal
+      ? null
+      : isSkipped(bal)
+        ? { skipped: true }
+        : {
+            stages: bal.stages.map((x) => ({ stage: x.stage, heldSec: Math.min(10, Math.max(0, x.heldS)), completed: x.completed })),
+            tandemHeld10: bal.tandemHeld10,
+          },
+    walkingAid: s.profile.walkingAid ?? null,
   };
 }

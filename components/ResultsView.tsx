@@ -2,9 +2,8 @@
 
 import { STRINGS, type Lang } from "../lib/i18n";
 import { chairMeasured, isSkipped, tugMeasured, type SessionState } from "../lib/session";
-import { reportFacts, stepOrder, STEP_TEXT } from "../lib/report";
+import { exerciseTitle, planContext, reportFacts, stepDetail, stepOrder, STEP_TEXT } from "../lib/report";
 import { TUG_RISK_SECONDS } from "../lib/signal/thresholds";
-import { cmToFtIn } from "../lib/measure";
 import { AppShell } from "./AppShell";
 import { StatusBadge } from "./StatusBadge";
 import { TugResultCard } from "./TugResultCard";
@@ -59,7 +58,7 @@ const R = {
 export type PlanState =
   | { state: "loading" }
   | { state: "ai"; output: ReportOutput }
-  | { state: "standard" }
+  | { state: "standard"; reason?: "no_key" | "checks" | "error" }
   | { state: "offline" };
 
 export function ResultsView({
@@ -80,6 +79,7 @@ export function ResultsView({
   const r = R[lang];
   const f = reportFacts(s);
   const steps = stepOrder(f);
+  const ctx = planContext(s);
   const yesCount = [s.screening.unsteady, s.screening.worry, s.screening.fallen].filter(Boolean).length;
   const tug = tugMeasured(s.tug);
   const chair = chairMeasured(s.chair);
@@ -185,17 +185,37 @@ export function ResultsView({
                   <p>{st.body}</p>
                 </li>
               ))
-            : steps.map((k) => (
-                <li key={k}>
-                  <b>{STEP_TEXT[lang][k].title}</b>
-                  <p>{STEP_TEXT[lang][k].body}</p>
-                </li>
-              ))}
+            : steps.map((k) => {
+                const detail = stepDetail(k, ctx, lang);
+                return (
+                  <li key={k}>
+                    <b>{k === "exercise" ? exerciseTitle(ctx, lang) : STEP_TEXT[lang][k].title}</b>
+                    {detail && (
+                      <p className="plan-detail">
+                        <b>{t.planForYou}</b> {detail}
+                      </p>
+                    )}
+                    <p>{STEP_TEXT[lang][k].body}</p>
+                  </li>
+                );
+              })}
         </ol>
-        {plan.state !== "standard" && (
+        {(plan.state !== "standard" || plan.reason) && (
           <p className="footnote" aria-live="polite">
             <Icon name={plan.state === "loading" ? "clock" : "info"} size={20} />
-            <span>{plan.state === "loading" ? t.reportWriting : plan.state === "offline" ? t.reportOffline : t.reportAi}</span>
+            <span>
+              {plan.state === "loading"
+                ? t.reportWriting
+                : plan.state === "offline"
+                  ? t.reportOffline
+                  : plan.state === "ai"
+                    ? t.reportAi
+                    : plan.reason === "no_key"
+                      ? t.reportNoKey
+                      : plan.reason === "checks"
+                        ? t.reportChecks
+                        : t.reportError}
+            </span>
           </p>
         )}
 
@@ -218,7 +238,7 @@ export function ResultsView({
         </p>
         <table>
           <tbody>
-            <tr><th>Patient</th><td>{name || "—"}, age {s.profile.age}, {s.profile.sex}, height {s.profile.heightCm} cm ({cmToFtIn(s.profile.heightCm)}), walking aid: {s.profile.walkingAid}</td></tr>
+            <tr><th>Patient</th><td>{name || "—"}, age {s.profile.age}, {s.profile.sex}, walking aid: {s.profile.walkingAid}</td></tr>
             <tr>
               <th>STEADI screen</th>
               <td>

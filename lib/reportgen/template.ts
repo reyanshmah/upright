@@ -56,6 +56,13 @@ function clinician(f: WriterFacts): string {
   } else {
     parts.push(c.status === "skipped" ? "30-Second Chair Stand: not done." : "30-Second Chair Stand: could not be measured; no score recorded.");
   }
+  const b = f.balance;
+  if (b.status === "measured") {
+    const held = b.positions.map((p) => `position ${p.position} ${p.heldSec} s${p.held10 ? "" : " (feet moved)"}`).join(", ");
+    parts.push(
+      `4-Stage Balance: ${held}; ${b.tandemHeld10 ? "tandem stance held 10 s" : "could not hold the tandem stance for 10 s (CDC: increased fall risk)"}.`,
+    );
+  }
   parts.push(STRINGS.en.disclaimer);
   return parts.join(" ");
 }

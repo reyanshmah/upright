@@ -152,3 +152,111 @@ describe("balance: camera swaps left/right foot labels (real-phone bug)", () => 
     expect(det.results[0].completed).toBe(true);
   });
 });
+
+describe("balance: the person holding the phone can move a little (Nov 14)", () => {
+  /** Moves the whole picture: shift (px), zoom about the centre, and tilt (deg). */
+  const camera = (lms: Landmark[], dx: number, dy: number, zoom = 1, rollDeg = 0) => {
+    const r = (rollDeg * Math.PI) / 180;
+    return lms.map((p) => {
+      const x = (p.x - 0.5) * zoom, y = (p.y - 0.5) * zoom;
+      return {
+        ...p,
+        x: 0.5 + x * Math.cos(r) - y * Math.sin(r) + dx / 1000,
+        y: 0.5 + x * Math.sin(r) + y * Math.cos(r) + dy / 1000,
+      };
+    });
+  };
+  // Hand-held drift: slow sideways/up-down wander, a slight zoom and tilt.
+  const handheld = (t: number) => ({
+    dx: 60 * Math.sin(t * 0.9) + 8 * Math.sin(t * 7),
+    dy: 25 * Math.sin(t * 1.3),
+    zoom: 1 + 0.12 * Math.sin(t * 0.5),
+    roll: 6 * Math.sin(t * 0.7),
+  });
+
+  for (const stage of [1, 2, 3, 4] as Stage[]) {
+    it(`position ${stage}: completes the 10 s hold while the phone drifts, zooms and tilts`, () => {
+      const det = run(stage, (t) => {
+        const c = handheld(t);
+        return camera(STANCE[stage](), c.dx, c.dy, c.zoom, c.roll);
+      }, 16);
+      expect(det.results[0].completed).toBe(true);
+      expect(det.results[0].heldS).toBe(10);
+    });
+  }
+
+  it("a quick 4 cm wiggle of one foot doesn't end the hold", () => {
+    // back foot slides 10 px (~4 cm) for half a second, then returns
+    const det = run(3, (t) => (t > 5 && t < 5.5 ? front(503, 487) : STANCE[3]()), 14);
+    expect(det.results[0].completed).toBe(true);
+  });
+
+  it("still catches a small real step (~14 cm) even while the phone moves", () => {
+    const det = run(3, (t) => {
+      const c = handheld(t);
+      return camera(t < 6.8 ? STANCE[3]() : front(503, 462), c.dx, c.dy, c.zoom, c.roll);
+    }, 14);
+    expect(det.results[0].completed).toBe(false);
+    expect(det.results[0].heldS).toBeGreaterThan(5.5);
+    expect(det.results[0].heldS).toBeLessThan(6.6);
+  });
+
+  it("feet out of view mid-hold = couldn't measure, not a balance failure", () => {
+    const fx = new FrontFeatures(1000, 1000);
+    const det = new BalanceDetector();
+    det.startStage(3, 0);
+    for (let i = 0; i <= 14 * 30; i++) {
+      const t = (i / 30) * 1000;
+      const lms = t > 5000 ? null : STANCE[3]();
+      det.push(lms ? fx.push(t, lms) : null, t);
+    }
+    expect(det.status).toBe("lost");
+    expect(det.results.length).toBe(0);
+  });
+});
+
+describe("balance: full 4-position run filmed from 45 degrees (Nov 14 placement)", () => {
+  // Feet in the person's own frame (px; 100 px = shank ~40 cm): x = sideways, z = forward.
+  type Feet = { lx: number; lz: number; rx: number; rz: number; lift: number };
+  const POS: Record<Stage, Feet> = {
+    1: { lx: 40, lz: 0, rx: -40, rz: 0, lift: 0 }, // side by side
+    2: { lx: 6, lz: 30, rx: -6, rz: 0, lift: 0 }, // instep at the big toe
+    3: { lx: 0, lz: 62, rx: 0, rz: 0, lift: 0 }, // heel to toe
+    4: { lx: 20, lz: 0, rx: -20, rz: 0, lift: 45 }, // on one foot
+  };
+  const c = Math.cos(Math.PI / 4), sn = Math.sin(Math.PI / 4);
+  const proj = (x: number, z: number) => 500 + x * c + z * sn;
+  const view45 = (p: Feet): Landmark[] => {
+    const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.3, z: 0, visibility: 0.95 }));
+    const set = (i: number, x: number, y: number) => (lm[i] = { x: x / 1000, y: y / 1000, z: 0, visibility: 0.95 });
+    const hz = (p.lz + p.rz) / 2;
+    set(23, proj(50, hz), 500);
+    set(24, proj(-50, hz), 500);
+    set(25, proj(p.lx, p.lz), 650);
+    set(26, proj(p.rx, p.rz), 650 - p.lift);
+    set(27, proj(p.lx, p.lz), 750);
+    set(28, proj(p.rx, p.rz), 750 - p.lift);
+    return lm;
+  };
+
+  it("recognizes every position, holds each for 10 s, and reports tandem held", () => {
+    const fx = new FrontFeatures(1000, 1000);
+    const det = new BalanceDetector();
+    let t = 0;
+    const tick = (pos: Feet) => {
+      det.push(fx.push(t, view45(pos)), t);
+      t += 1000 / 30;
+    };
+    for (const stage of [1, 2, 3, 4] as Stage[]) {
+      det.startStage(stage, t);
+      const prev = POS[(stage > 1 ? stage - 1 : 1) as Stage];
+      // ~1.5 s still in the old position while the instruction is spoken, then the new one
+      const startT = t;
+      while (det.status === "waitStance" && t - startT < 20_000) tick(t - startT < 1500 ? prev : POS[stage]);
+      while (det.status === "holding") tick(POS[stage]);
+      expect(det.status).toBe("held");
+    }
+    expect(det.results.map((r) => r.stanceVerified)).toEqual([true, true, true, true]);
+    expect(tandemHeld10(det.results)).toBe(true);
+  });
+});

@@ -8,9 +8,10 @@ import { CameraControls } from "@/components/CameraControls";
 import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AUTO_NEXT_S, cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
+import { SetupDiagram } from "@/components/Diagram";
 import { playCue, playCueAndWait, stopCues, unlockAudio, type CueId } from "@/lib/voice";
 import { getAutoStart } from "@/lib/displayPrefs";
-import { phoneMoved, resetPhoneMotion, startPhoneMotion } from "@/lib/motion";
+import { resetPhoneMotion, startPhoneMotion } from "@/lib/motion";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
 import { angleDeg } from "@/lib/signal/geometry";
 import { StableFlag } from "@/lib/signal/gate";
@@ -21,6 +22,10 @@ import type { BalanceResult } from "@/lib/session";
 type Phase = "intro" | "position" | "running" | "aborted" | "failed" | "done";
 type StageView = "instr" | "wait" | "hold" | "held" | "moved";
 
+/** Say the position again if they aren't in it after this long. */
+const REPEAT_AFTER_MS = 7000;
+/** Times a position is redone because the camera lost the feet, before giving up. */
+const MAX_LOST_RETRIES = 2;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function BalanceRunner({
@@ -88,11 +93,9 @@ export function BalanceRunner({
       }
     }
 
-    if (p === "running" && phoneMoved()) {
-      // The phone was picked up or turned: the stance can't be judged any more.
-      abort(t.phoneMovedRun);
-      return;
-    }
+    // The phone moving no longer stops the balance test (Nov 14): the feet are
+    // measured relative to each other, so a hand-held phone may move a little.
+    // Losing sight of them retries the position instead.
 
     if (p === "running") {
       frameOk.current.total++;
@@ -171,34 +174,64 @@ export function BalanceRunner({
     setView("instr");
     await playCueAndWait(lang, "balIntro", t.balSpokenIntro);
 
-    for (const s of [1, 2, 3, 4] as Stage[]) {
-      if (aborted.current) return;
-      setStage(s);
-      setHoldS(0);
-      setView("instr");
-      await playCueAndWait(lang, `bal${s}` as CueId, t.balStages[s]);
-      if (aborted.current) return;
-      det.current.startStage(s, performance.now());
-      setView("wait");
-      await waitFor(() => st() !== "waitStance");
-      if (aborted.current) return;
-      if (st() === "lost") return fail();
-      setView("hold");
-      void playCue(lang, "hold", t.balHold);
-      await waitFor(() => ["held", "failed", "lost"].includes(st()));
-      if (aborted.current) return;
-      if (st() === "lost") return fail();
-      if (st() === "failed") {
-        setView("moved");
-        void playCue(lang, "stop", t.cueStop);
-        await sleep(1200);
-        break; // CDC: if they can't hold a position, stop the test
+    // Everything the person must do is SAID, since they can't see the phone.
+    let stopped = false;
+    stages: for (const s of [1, 2, 3, 4] as Stage[]) {
+      for (let attempt = 0; ; attempt++) {
+        if (aborted.current) return;
+        setStage(s);
+        setHoldS(0);
+        setView("instr");
+        await playCueAndWait(lang, `bal${s}` as CueId, t.balSpokenStage(s, t.balStages[s]));
+        if (aborted.current) return;
+        det.current.startStage(s, performance.now());
+        setView("wait");
+        // Not in position after a while: say it again, once.
+        const waitStart = performance.now();
+        let repeated = false;
+        await waitFor(() => {
+          if (!repeated && st() === "waitStance" && performance.now() - waitStart > REPEAT_AFTER_MS) {
+            repeated = true;
+            void playCue(lang, "balRepeat", t.balRepeat(t.balStages[s]));
+          }
+          return st() !== "waitStance";
+        });
+        if (aborted.current) return;
+        if (st() !== "lost") {
+          setView("hold");
+          void playCue(lang, "hold", t.balHold);
+          let saidFive = false;
+          await waitFor(() => {
+            if (!saidFive && st() === "holding" && det.current.heldS >= HOLD_S / 2) {
+              saidFive = true;
+              void playCue(lang, "balFive", t.balFiveMore);
+            }
+            return ["held", "failed", "lost"].includes(st());
+          });
+          if (aborted.current) return;
+        }
+        if (st() === "lost") {
+          // Camera lost the feet: a camera problem, not a balance failure. Redo the position.
+          if (attempt >= MAX_LOST_RETRIES) return fail();
+          setView("instr");
+          await playCueAndWait(lang, "balLost", t.balLostRetry);
+          continue;
+        }
+        if (st() === "failed") {
+          setView("moved");
+          await playCueAndWait(lang, "balFail", t.balFailSpoken);
+          stopped = true;
+          break stages; // CDC: if they can't hold a position, stop the test
+        }
+        setView("held");
+        setHoldS(HOLD_S);
+        void playCue(lang, "good", t.balGood);
+        await sleep(1500);
+        break;
       }
-      setView("held");
-      setHoldS(HOLD_S);
-      void playCue(lang, "good", t.balGood);
-      await sleep(1500);
     }
+    if (!stopped && !aborted.current) await playCueAndWait(lang, "balEnd", t.balEndSpoken);
+    if (aborted.current) return;
     finish();
   };
 
@@ -371,8 +404,10 @@ export function BalanceRunner({
             {t.balRules.map((r, i) => <li key={i}>{r}</li>)}
           </ul>
           <h2 className="h2">{t.placementTitle}</h2>
+          <SetupDiagram kind="balance" lang={lang} />
           <p>{t.balPlace}</p>
-          <p className="callout">{t.spotterTip}</p>
+          <p className="callout">{t.balSafety}</p>
+          <p className="note">{t.balListen}</p>
           <button type="button" className="linkish" onClick={() => onSkip("user skipped")}>
             {t.skipTest}
           </button>

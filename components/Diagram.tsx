@@ -12,10 +12,14 @@ import { STRINGS, type Lang } from "../lib/i18n";
  *           phone on a stand to the side with its camera view covering chair and mark.
  *  chair:   top view of chair + phone, plus a side view: arms crossed, 17 in seat
  *           (CDC form), phone at hip height.
+ *  balance: top view of the person standing next to a wall or counter, the line
+ *           straight ahead of them, and the phone held about 2 m away at 45 degrees
+ *           (so the camera sees both the gap between the feet and a foot moving forward).
  *
  * Plan drawings are not to scale; the numbers are.
  */
-export function SetupDiagram({ kind, lang }: { kind: "tug" | "chair" | "measure"; lang: Lang }) {
+export function SetupDiagram({ kind, lang }: { kind: "tug" | "chair" | "measure" | "balance"; lang: Lang }) {
+  if (kind === "balance") return <BalanceDiagram lang={lang} />;
   const t = STRINGS[lang];
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const ids = { hatch: `${uid}-hatch`, ink: `${uid}-arrow-ink`, act: `${uid}-arrow-act` };
@@ -106,6 +110,88 @@ export function SetupDiagram({ kind, lang }: { kind: "tug" | "chair" | "measure"
           <SideView t={t} hatch={ids.hatch} marker={ids.ink} />
         </>
       )}
+    </svg>
+  );
+}
+
+/**
+ * Balance test, top view. The person stands near a wall (within reach), facing
+ * down the page; the phone is held about 2 m away at 45 degrees from straight ahead.
+ */
+function BalanceDiagram({ lang }: { lang: Lang }) {
+  const t = STRINGS[lang];
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const ids = { hatch: `${uid}-hatch`, ink: `${uid}-arrow-ink`, act: `${uid}-arrow-act` };
+  const H = 300;
+  const P = { x: 78, y: 92 }; // person (centre of the feet)
+  const L = 175; // ~2 m, drawn
+  const a = Math.PI / 4;
+  const phone = { x: P.x + L * Math.sin(a), y: P.y + L * Math.cos(a) };
+  const arcR = 46;
+  return (
+    <svg className="diagram" viewBox={`0 0 360 ${H}`} role="img" aria-label={t.diaAltBalance} fontFamily="inherit">
+      <defs>
+        <pattern id={ids.hatch} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="8" height="8" style={{ fill: "var(--line)" }} />
+          <line x1="0" y1="0" x2="0" y2="8" style={{ stroke: "var(--ink-2)" }} strokeWidth="2" opacity="0.45" />
+        </pattern>
+        <marker id={ids.ink} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 1 L10 5 L0 9 z" style={{ fill: "var(--ink)" }} />
+        </marker>
+        <marker id={ids.act} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" style={{ fill: "var(--act)" }} />
+        </marker>
+      </defs>
+      <Floor h={H} />
+
+      {/* camera view from the phone back to the person */}
+      <CameraView apex={[phone.x, phone.y]} left={[P.x - 62, P.y - 2]} right={[P.x + 10, P.y - 58]} />
+
+      {/* wall or counter, within arm's reach */}
+      <rect x="0" y="0" width="16" height={H} fill={`url(#${ids.hatch})`} />
+      <Label x={9} y={H - 14} size={12} anchor="start" rotate muted>
+        {t.diaWallReach}
+      </Label>
+
+      {/* straight ahead of the person */}
+      <line x1={P.x} y1={P.y + 18} x2={P.x} y2={H - 8} strokeWidth="1.5" strokeDasharray="4 5" style={{ stroke: "var(--ink-2)" }} />
+      <Label x={P.x + 6} y={H - 14} size={12} anchor="start" muted>
+        {t.diaFacing}
+      </Label>
+
+      {/* the 45 degree line to the phone, with its angle */}
+      <line x1={P.x} y1={P.y + 18} x2={phone.x - 8} y2={phone.y - 8} strokeWidth="2.5" strokeDasharray="8 6" style={{ stroke: "var(--act)" }} markerEnd={`url(#${ids.act})`} />
+      <path
+        d={`M${P.x} ${P.y + 18 + arcR} A${arcR} ${arcR} 0 0 0 ${P.x + arcR * Math.sin(a)} ${P.y + 18 + arcR * Math.cos(a)}`}
+        strokeWidth="2"
+        fill="none"
+        style={{ stroke: "var(--ink)" }}
+      />
+      <Label x={P.x + 22} y={P.y + 18 + arcR + 18} size={16} weight={700}>
+        45°
+      </Label>
+      <Label x={(P.x + phone.x) / 2 + 30} y={(P.y + phone.y) / 2 - 2} size={14} weight={700} anchor="start">
+        {t.diaAbout2m}
+      </Label>
+
+      {/* the person, from above, facing down the page */}
+      <ellipse cx={P.x} cy={P.y - 14} rx="24" ry="9" style={{ fill: "var(--ink-2)" }} />
+      <circle cx={P.x} cy={P.y - 14} r="9" style={{ fill: "var(--ink)" }} />
+      <ellipse cx={P.x - 7} cy={P.y + 4} rx="5" ry="9" style={{ fill: "var(--ink)" }} />
+      <ellipse cx={P.x + 7} cy={P.y + 4} rx="5" ry="9" style={{ fill: "var(--ink)" }} />
+      <Label x={P.x + 34} y={P.y - 26} size={14} weight={700} anchor="start">
+        {t.diaPerson}
+      </Label>
+
+      {/* the helper holding the phone, lens toward the person */}
+      <g transform={`translate(${phone.x} ${phone.y}) rotate(-135)`}>
+        <rect x="-9" y="-5" width="18" height="30" rx="4" style={{ fill: "var(--ink)" }} />
+        <circle cx="0" cy="-3" r="4" strokeWidth="2" style={{ fill: "var(--act)", stroke: "var(--card)" }} />
+      </g>
+      <circle cx={phone.x + 20} cy={phone.y + 20} r="10" style={{ fill: "var(--ink-2)" }} />
+      <Label x={phone.x - 4} y={phone.y + 50} size={14} weight={700}>
+        {t.diaHelperPhone}
+      </Label>
     </svg>
   );
 }

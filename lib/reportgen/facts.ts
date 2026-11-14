@@ -4,7 +4,7 @@
  * logs and fps are full of numbers it must never repeat), and the number check
  * allows only these values, in the exact string form the engine shows them.
  */
-import { stepOrder, type ReportFacts, type StepKey } from "../report";
+import { focusAreas, stepDetail, stepOrder, type Focus, type PlanContext, type ReportFacts, type StepKey } from "../report";
 import { bandAge } from "../sessionFile";
 import { chairStandNorm, scoreChairStand, TUG_RISK_SECONDS } from "../signal/thresholds";
 import type { ReportInput } from "./schema";
@@ -40,10 +40,24 @@ export interface WriterFacts {
   chair:
     | { status: "skipped" | "could_not_measure" }
     | { status: "measured"; score: string; stands: string; armsUsed: boolean; norm: string | null; belowAverage: boolean | null };
-  /** Any risk flag set (screen, TUG >= 12 s, or chair stand below average). */
+  balance:
+    | { status: "skipped" }
+    | {
+        status: "measured";
+        /** Each position tried: held seconds ("6.4") and whether the full 10 s was held. */
+        positions: { position: number; heldSec: string; held10: boolean }[];
+        /** CDC: could not hold the heel-to-toe (tandem) position for 10 s = increased risk. */
+        tandemHeld10: boolean;
+      };
+  walkingAid: "none" | "cane" | "walker" | "other" | null;
+  /** Any risk flag set (screen, TUG >= 12 s, chair stand below average, or tandem under 10 s). */
   higherRisk: boolean;
+  /** What this person's plan should focus on, from their own results. */
+  focus: Focus[];
   /** The family plan steps, in order. */
   stepOrder: StepKey[];
+  /** One note per step tying it to this person's results (in the FACTS language). */
+  personalNotes: Partial<Record<StepKey, string>>;
 }
 
 /** Allowed numerals, by the unit they may appear with. */
@@ -91,6 +105,17 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
         }
       : { status: c && !("skipped" in c) ? "could_not_measure" : "skipped" };
 
+  const b = input.balance;
+  const balMeasured = b && !("skipped" in b) ? b : null;
+  const balance: WriterFacts["balance"] = balMeasured
+    ? {
+        status: "measured",
+        positions: balMeasured.stages.map((x) => ({ position: x.stage, heldSec: fmtSec(x.heldSec), held10: x.completed })),
+        tandemHeld10: balMeasured.tandemHeld10,
+      }
+    : { status: "skipped" };
+  const balRisk = balMeasured ? !balMeasured.tandemHeld10 : null;
+
   const tugAtRiskFlag = tugMeasured ? tugMeasured.riskFlag : null;
   const chairBelow = sc ? sc.belowAverage : null;
   const reportFacts: ReportFacts = {
@@ -101,12 +126,32 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
     chairNorm: sc ? sc.norm : null,
     chairBelow,
     armsUsed: chairMeasured ? chairMeasured.armUse : null,
-    // The report route's input carries TUG and chair only; the balance test is not sent yet.
-    balanceAtRisk: null,
+    balanceAtRisk: balRisk,
     injuredFall: !!s.injured,
     multipleFalls: s.fallCount === "2" || s.fallCount === "3+",
-    higherRisk: screenedAtRisk || tugAtRiskFlag === true || chairBelow === true,
+    higherRisk: screenedAtRisk || tugAtRiskFlag === true || chairBelow === true || balRisk === true,
   };
+
+  const failed = balMeasured ? balMeasured.stages.find((x) => !x.completed) ?? null : null;
+  const ctx: PlanContext = {
+    screening: s,
+    walkingAid: input.walkingAid ?? null,
+    tugSec: "totalSec" in tug ? tug.totalSec : null,
+    tugAtRisk: tugAtRiskFlag,
+    chairScore: chair.status === "measured" ? chair.score : null,
+    chairNorm: chair.status === "measured" ? chair.norm : null,
+    chairBelow,
+    armsUsed: chairMeasured ? chairMeasured.armUse : null,
+    balance: balMeasured
+      ? { tandemHeld10: balMeasured.tandemHeld10, failedStage: failed ? failed.stage : null, failedHeldSec: failed ? fmtSec(failed.heldSec) : null }
+      : null,
+  };
+  const order = stepOrder(reportFacts);
+  const personalNotes: Partial<Record<StepKey, string>> = {};
+  for (const k of order) {
+    const d = stepDetail(k, ctx, input.lang);
+    if (d) personalNotes[k] = d;
+  }
 
   const facts: WriterFacts = {
     lang: input.lang,
@@ -115,8 +160,12 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
     screening: { yesCount, screenedAtRisk, ...s },
     tug,
     chair,
+    balance,
+    walkingAid: input.walkingAid ?? null,
     higherRisk: reportFacts.higherRisk,
-    stepOrder: stepOrder(reportFacts),
+    focus: focusAreas(ctx),
+    stepOrder: order,
+    personalNotes,
   };
 
   const seconds = new Set<string>(STEADI_CONSTANTS.seconds);
@@ -124,11 +173,17 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
     seconds.add(tug.totalSec);
     for (const v of Object.values(tug.phases ?? {})) seconds.add(v);
   }
+  if (balance.status === "measured") {
+    seconds.add("10"); // the CDC hold time
+    for (const p of balance.positions) seconds.add(p.heldSec);
+  }
   const stands = new Set<string>();
   if (chair.status === "measured") {
     stands.add(chair.stands).add(chair.score);
     if (chair.norm) stands.add(chair.norm);
   }
+  // "fell 2 times": "times" reads as a count, so the fall count may appear with it.
+  if (s.fallCount) stands.add(s.fallCount.replace("+", ""));
   const meters = new Set<string>(STEADI_CONSTANTS.meters);
   const years = new Set<string>(["65", ...(input.ageBand.match(/\d+/g) ?? [])]);
   const bare = new Set<string>([
@@ -139,6 +194,8 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
     ...STEADI_CONSTANTS.bare,
     String(yesCount),
     ...(s.fallCount ? [s.fallCount.replace("+", "")] : []),
+    // balance position numbers ("position 3")
+    ...(balance.status === "measured" ? ["1", "2", "3", "4"] : []),
   ]);
   return { facts, allowed: { seconds, stands, meters, years, bare }, reportFacts };
 }

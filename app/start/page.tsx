@@ -9,8 +9,6 @@ import { AppShell, PinnedRow } from "@/components/AppShell";
 import { ChoiceGroup, Field } from "@/components/Form";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/StatusBadge";
-import { HeightInput, type HeightUnit } from "@/components/HeightInput";
-import { HEIGHT_MAX_CM, HEIGHT_MIN_CM } from "@/lib/measure";
 import { speakText } from "@/lib/voice";
 import {
   loadSession,
@@ -44,8 +42,6 @@ export default function Start() {
   const [ageText, setAgeText] = useState("");
   const [sex, setSex] = useState<Sex | null>(null);
   const [aid, setAid] = useState<WalkingAid | null>(null);
-  const [heightUnit, setHeightUnit] = useState<HeightUnit>("imperial");
-  const [heightCm, setHeightCm] = useState<number | null>(null);
   const [unsteady, setUnsteady] = useState<YesNo>(null);
   const [worry, setWorry] = useState<YesNo>(null);
   const [fallen, setFallen] = useState<YesNo>(null);
@@ -57,7 +53,6 @@ export default function Start() {
   useEffect(() => {
     const l = detectLang();
     setLang(l);
-    setHeightUnit(l === "es" ? "metric" : "imperial");
     setCanSpeak(typeof window !== "undefined" && "speechSynthesis" in window);
     // Back from Setup: reopen the summary with the saved answers instead of a blank form.
     const prev = new URLSearchParams(window.location.search).get("resume") ? loadSession() : null;
@@ -67,7 +62,6 @@ export default function Start() {
       setAgeText(String(prev.profile.age));
       setSex(prev.profile.sex);
       setAid(prev.profile.walkingAid);
-      setHeightCm(prev.profile.heightCm);
       setUnsteady(prev.screening.unsteady);
       setWorry(prev.screening.worry);
       setFallen(prev.screening.fallen);
@@ -93,12 +87,11 @@ export default function Start() {
 
   const age = Number(ageText);
   const ageValid = ageText !== "" && Number.isInteger(age) && age >= 18 && age <= 110;
-  const heightValid = heightCm !== null && heightCm >= HEIGHT_MIN_CM && heightCm <= HEIGHT_MAX_CM;
 
   const stepOk: Record<Step, boolean> = {
     welcome: true,
     about: ageValid && sex !== null,
-    body: heightValid && aid !== null,
+    body: aid !== null,
     q1: unsteady !== null,
     q2: worry !== null,
     q3: fallen !== null && (fallen === false || (fallCount !== null && injured !== null)),
@@ -123,7 +116,7 @@ export default function Start() {
       saveSession({
         lang,
         runner: "helper",
-        profile: { firstName: name, age, sex: sex!, walkingAid: aid!, heightCm: Math.round(heightCm!) },
+        profile: { firstName: name, age, sex: sex!, walkingAid: aid! },
         screening,
         createdAt: new Date().toISOString(),
       });
@@ -299,15 +292,6 @@ export default function Start() {
       {step === "body" && (
         <section className="stack">
           <h1 className="h1">{t.bodyTitle}</h1>
-          <HeightInput
-            t={t}
-            unit={heightUnit}
-            onUnit={setHeightUnit}
-            cm={heightCm}
-            onCm={setHeightCm}
-            sex={sex}
-            showError={touched && !heightValid}
-          />
           <ChoiceGroup
             legend={helper ? t.aidLabel : t.aidLabelSelf}
             value={aid}

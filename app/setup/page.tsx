@@ -156,6 +156,8 @@ export default function Setup() {
           <PoseMeasure
             lang={lang}
             heightCm={session.profile.heightCm}
+            sex={session.profile.sex}
+            onHeight={(cm) => updateSession({ profile: { ...session.profile, heightCm: cm } })}
             onBack={() => setStep(ios ? "method" : "ar")}
             onDone={(m) => finish("pose", m)}
           />

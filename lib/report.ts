@@ -112,3 +112,151 @@ export const STEP_TEXT: Record<Lang, Record<StepKey, StepText>> = {
     },
   },
 };
+
+/* ---------- Personalization (Nov 14) ----------
+ * The same five STEADI steps for everyone read as a generic handout. Each step
+ * now adds one or two sentences tied to THIS person's answers and measured
+ * results, and the exercise step names strength or balance from what was weak.
+ * Plain inputs (strings already formatted the way the results screen shows
+ * them) so both the on-device plan and the AI writer's facts can use it.
+ */
+
+export type WalkingAidKind = "none" | "cane" | "walker" | "other";
+
+export interface PlanContext {
+  screening: { unsteady: boolean; worry: boolean; fallen: boolean; fallCount: "1" | "2" | "3+" | null; injured: boolean | null };
+  walkingAid: WalkingAidKind | null;
+  /** Measured TUG total ("9.8"), or null. */
+  tugSec: string | null;
+  tugAtRisk: boolean | null;
+  chairScore: string | null;
+  chairNorm: string | null;
+  chairBelow: boolean | null;
+  armsUsed: boolean | null;
+  /** null = balance not done. failedStage = the position they could not hold (or null if all held). */
+  balance: { tandemHeld10: boolean; failedStage: number | null; failedHeldSec: string | null } | null;
+}
+
+/** What the plan should focus on, from the person's own results (also sent to the AI writer). */
+export type Focus =
+  | "leg_strength"
+  | "balance"
+  | "walking_speed"
+  | "fear_of_falling"
+  | "injured_in_fall"
+  | "repeated_falls"
+  | "feels_unsteady"
+  | "uses_cane"
+  | "uses_walker"
+  | "keep_it_up";
+
+export function focusAreas(c: PlanContext): Focus[] {
+  const f: Focus[] = [];
+  if (c.armsUsed || c.chairBelow) f.push("leg_strength");
+  if (c.balance && !c.balance.tandemHeld10) f.push("balance");
+  if (c.tugAtRisk) f.push("walking_speed");
+  if (c.screening.worry) f.push("fear_of_falling");
+  if (c.screening.injured) f.push("injured_in_fall");
+  if (c.screening.fallCount === "2" || c.screening.fallCount === "3+") f.push("repeated_falls");
+  if (c.screening.unsteady) f.push("feels_unsteady");
+  if (c.walkingAid === "cane") f.push("uses_cane");
+  if (c.walkingAid === "walker") f.push("uses_walker");
+  if (!f.some((x) => x === "leg_strength" || x === "balance" || x === "walking_speed")) f.push("keep_it_up");
+  return f;
+}
+
+const fallsText = { en: { "2": "2 times", "3+": "3 or more times" }, es: { "2": "2 veces", "3+": "3 o más veces" } } as const;
+
+/** Title for the exercise step: strength, balance, or both, from what was weak. */
+export function exerciseTitle(c: PlanContext, lang: Lang): string {
+  const legs = !!(c.armsUsed || c.chairBelow);
+  const bal = !!((c.balance && !c.balance.tandemHeld10) || c.tugAtRisk);
+  if (legs && !bal) return lang === "es" ? "Haga ejercicios para fortalecer las piernas" : "Build leg strength";
+  if (bal && !legs) return lang === "es" ? "Practique ejercicios de equilibrio" : "Practice balance exercises";
+  if (!legs && !bal) return lang === "es" ? "Manténgase activo" : "Stay active";
+  return STEP_TEXT[lang].exercise.title;
+}
+
+/** One or two sentences that connect a step to this person's results (null = nothing specific). */
+export function stepDetail(key: StepKey, c: PlanContext, lang: Lang): string | null {
+  const es = lang === "es";
+  const s = c.screening;
+  const out: string[] = [];
+  const multi = s.fallCount === "2" || s.fallCount === "3+" ? fallsText[lang][s.fallCount] : null;
+  switch (key) {
+    case "doctor":
+      if (s.injured) out.push(es ? "Cuéntele sobre la caída en la que se lastimó." : "Tell them about the fall where you were hurt.");
+      else if (multi) out.push(es ? `Dígale que se cayó ${multi} en el último año.` : `Tell them you fell ${multi} in the past year.`);
+      if (s.worry) out.push(es ? "Dígale también que le preocupa caerse; vale la pena hablarlo." : "Also tell them you worry about falling. That worry is worth talking about.");
+      else if (s.unsteady) out.push(es ? "Dígale que se siente inestable al estar de pie o caminar." : "Tell them you feel unsteady when standing or walking.");
+      if (!out.length && c.tugAtRisk && c.tugSec)
+        out.push(es ? `Muéstrele su tiempo de Levántate y Anda: ${c.tugSec} segundos.` : `Show them your Timed Up and Go time: ${c.tugSec} seconds.`);
+      break;
+    case "exercise":
+      if (c.armsUsed)
+        out.push(es ? "Necesitó los brazos para levantarse de la silla, así que fortalecer las piernas es lo que más ayuda." : "You needed your arms to stand up from the chair, so leg-strength exercises will help most.");
+      else if (c.chairBelow && c.chairScore && c.chairNorm)
+        out.push(
+          es
+            ? `Se levantó ${c.chairScore} veces; para su edad, menos de ${c.chairNorm} está por debajo del promedio. Fortalecer las piernas ayuda con esto.`
+            : `You stood up ${c.chairScore} times; for your age, fewer than ${c.chairNorm} is below average. Leg-strength exercises help with this.`,
+        );
+      if (c.balance && !c.balance.tandemHeld10 && c.balance.failedStage && c.balance.failedHeldSec)
+        out.push(
+          es
+            ? `Mantuvo la posición ${c.balance.failedStage} durante ${c.balance.failedHeldSec} segundos. Los ejercicios de equilibrio practican justo esto; pregunte cuáles son seguros para usted.`
+            : `You held position ${c.balance.failedStage} for ${c.balance.failedHeldSec} seconds. Balance exercises practice exactly this; ask which ones are safe for you.`,
+        );
+      if (c.tugAtRisk && c.tugSec && out.length < 2)
+        out.push(
+          es
+            ? `Su prueba de caminar tomó ${c.tugSec} segundos (12 o más indica más riesgo). Practicar caminar y el equilibrio puede ayudar.`
+            : `Your walking test took ${c.tugSec} seconds (12 or more means higher risk). Walking and balance practice can help.`,
+        );
+      if (!out.length) out.push(es ? "Hoy le fue bien. Mantenerse activo ayuda a que siga así." : "Your results were good today. Staying active helps keep them that way.");
+      break;
+    case "meds":
+      if (s.unsteady) out.push(es ? "Dijo que se siente inestable; algunos medicamentos pueden influir, así que esta revisión es importante para usted." : "You said you feel unsteady. Some medicines can add to that, so this review matters for you.");
+      else if (s.fallen) out.push(es ? "Después de una caída, revisar los medicamentos es de lo primero que conviene hacer." : "After a fall, a medicine review is one of the first things to check.");
+      break;
+    case "home":
+      if (s.fallen) out.push(es ? "Empiece por el lugar donde se cayó y arregle lo que lo causó, si puede." : "Start with the place where you fell, and fix what caused it if you can.");
+      if (c.walkingAid === "walker") out.push(es ? "Con andador, mantenga los pasillos anchos y despejados, y quite los tapetes pequeños." : "With a walker, keep paths wide and clear, and remove small rugs.");
+      else if (c.walkingAid === "cane") out.push(es ? "Con bastón, asegúrese de que las escaleras tengan pasamanos a ambos lados." : "With a cane, make sure stairs have a rail on both sides.");
+      if (!out.length && s.worry) out.push(es ? "Una casa más segura también ayuda a moverse con más confianza." : "A safer home can also help you feel more confident moving around.");
+      break;
+    case "repeat":
+      if (c.tugSec) {
+        const chair = c.chairScore ? (es ? `, levantarse de la silla ${c.chairScore}` : `, chair stand ${c.chairScore}`) : "";
+        out.push(
+          es
+            ? `Anote los resultados de hoy (Levántate y Anda ${c.tugSec} segundos${chair}) para comparar el próximo año.`
+            : `Write down today's results (Timed Up and Go ${c.tugSec} seconds${chair}) to compare next year.`,
+        );
+      }
+      break;
+  }
+  return out.length ? out.slice(0, 2).join(" ") : null;
+}
+
+/** PlanContext from the session on the phone (numbers formatted like the results screen). */
+export function planContext(s: SessionState): PlanContext {
+  const tug = tugMeasured(s.tug);
+  const chair = chairMeasured(s.chair);
+  const sc = chair ? scoreChairStand(chair.stands, chair.armUse, s.profile.age, s.profile.sex) : null;
+  const bal = s.balance && !isSkipped(s.balance) ? s.balance : null;
+  const failed = bal ? bal.stages.find((x) => !x.completed) ?? null : null;
+  return {
+    screening: s.screening,
+    walkingAid: s.profile.walkingAid ?? null,
+    tugSec: tug ? tug.totalSec.toFixed(1) : null,
+    tugAtRisk: tug ? tugAtRisk(tug.totalSec) : null,
+    chairScore: sc ? String(sc.score) : null,
+    chairNorm: sc && sc.norm !== null ? String(sc.norm) : null,
+    chairBelow: sc ? sc.belowAverage : null,
+    armsUsed: chair ? chair.armUse : null,
+    balance: bal
+      ? { tandemHeld10: bal.tandemHeld10, failedStage: failed ? failed.stage : null, failedHeldSec: failed ? failed.heldS.toFixed(1) : null }
+      : null,
+  };
+}

@@ -454,6 +454,10 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
   width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border-radius: 50%;
   background: var(--info-bg); color: var(--info-fg); border: 2px solid var(--info-bd); font-weight: 700;
 }
+.plan .plan-detail {
+  margin: var(--sp-2) 0 var(--sp-1); padding: var(--sp-2) var(--sp-3);
+  background: var(--info-bg); color: var(--ink); border-radius: var(--radius);
+}
 .plan li > b { display: block; color: var(--info-fg); }
 .plan p { margin-top: var(--sp-1); }
 .plan-summary { font-size: var(--fs-lead); }

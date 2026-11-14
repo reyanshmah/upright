@@ -111,6 +111,38 @@ export const GATES = {
 export const BALANCE = {
   /** Both knees straighter than this (deg) = standing, ready to start. */
   standKneeDeg: 150,
+  /**
+   * NEW Nov 14 (user-approved): feet are measured RELATIVE TO EACH OTHER, so a
+   * hand-held phone can move, zoom or tilt a little without ending a hold.
+   * Positions 1-3: the gap between the feet (as a vector, in shank lengths)
+   * changing by more than moveRel (~12 cm) for moveMs = a step.
+   */
+  moveRel: 0.3,
+  moveMs: 400,
+  /** Reference gap = median over the first refMs of the hold; current = median over winMs. */
+  refMs: 500,
+  winMs: 300,
+  /** Position 4: the raised foot is "down" when it is within downLift shank lengths of the other foot's height. */
+  downLift: 0.07,
+  /** Moving within the first settleMs of a hold = still getting into position: restart the hold. */
+  settleMs: 1000,
+  /** Feet out of view this long during a hold = can't measure (not a balance failure). */
+  lostMs: 2500,
+  /** Ankles below this visibility are skipped for that frame. */
+  footVis: 0.5,
+  /** Scale (shank) uses a short rolling median so zooming in/out is followed quickly. */
+  scaleWindow: 20,
+  /**
+   * Getting into a position (works at any camera angle, incl. the 45 deg
+   * placement): the feet must be settled (gap varies < settledRel for
+   * settledMs) and, for positions 2-3, the gap must differ from the previous
+   * position's by more than changedRel (they actually moved their feet).
+   */
+  settledRel: 0.08,
+  settledMs: 800,
+  changedRel: 0.12,
+  /** Position 4: one foot this much higher than the other (shank lengths) = standing on one foot. */
+  oneFootLift: 0.18,
 } as const;
 
 /**

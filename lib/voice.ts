@@ -8,7 +8,8 @@ import { timeStretch } from "./timeStretch";
 /**
  * Voice cues. Recorded EN/ES clips live in public/audio/<lang>/<id>.mp3:
  * 3-2-1, Go and Stop (the "go" cue is time zero), plus the spoken instructions
- * (tugInstr, chairInstr, balIntro) and the short words (hold, good, done).
+ * (tugInstr, chairInstr) and the short words (hold, good, done). balIntro was
+ * re-worded on Nov 14 and plays through speech until it is re-recorded.
  * All recorded clips play through Web Audio (unlocked in the Start tap, so
  * they play on iPhone and get the loudness boost). If a clip is missing, the
  * browser's speech reads the same text.
@@ -31,6 +32,11 @@ export type CueId =
   | "done"
   | "armsUsed"
   | "balIntro"
+  | "balRepeat"
+  | "balFive"
+  | "balFail"
+  | "balEnd"
+  | "balLost"
   | "bal1"
   | "bal2"
   | "bal3"
@@ -96,7 +102,9 @@ function output(c: AudioContext): AudioNode {
 /** Cues whose timing matters: always normal speed. */
 const TIMED: CueId[] = RECORDED;
 /** Clips preloaded in the Start tap (all recorded files the screens use). */
-const PRELOAD: CueId[] = [...RECORDED, "tugInstr", "chairInstr", "balIntro", "hold", "good", "done"];
+// balIntro was re-worded on Nov 14 ("I will tell you", not "show you"): its old
+// recording was removed, so it plays through speech until a new take is added.
+const PRELOAD: CueId[] = [...RECORDED, "tugInstr", "chairInstr", "hold", "good", "done"];
 
 type Clip = { buf: AudioBuffer; onsetMs: number };
 

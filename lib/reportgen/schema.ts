@@ -63,6 +63,20 @@ const Chair = z
 
 const Skipped = z.strictObject({ skipped: z.literal(true) });
 
+/** NEW Nov 14: the balance test, so a balance risk no longer forces the standard plan. */
+const Balance = z
+  .strictObject({
+    stages: z
+      .array(z.strictObject({ stage: z.number().int().min(1).max(4), heldSec: z.number().finite().min(0).max(10), completed: z.boolean() }))
+      .max(4),
+    tandemHeld10: z.boolean(),
+  })
+  .superRefine((r, ctx) => {
+    if (r.tandemHeld10 !== r.stages.some((x) => x.stage === 3 && x.completed)) {
+      ctx.addIssue({ code: "custom", message: "tandemHeld10 does not match the stages" });
+    }
+  });
+
 export const ReportInputSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
@@ -78,6 +92,9 @@ export const ReportInputSchema = z
     }),
     tug: z.union([Tug, Skipped]).nullable(),
     chair: z.union([Chair, Skipped]).nullable(),
+    balance: z.union([Balance, Skipped]).nullable().optional(),
+    /** Not identifying; lets the plan fit a cane or walker. */
+    walkingAid: z.enum(["none", "cane", "walker", "other"]).nullable().optional(),
   })
   .superRefine((r, ctx) => {
     // The norm flag must match the CDC table for this age band and sex.

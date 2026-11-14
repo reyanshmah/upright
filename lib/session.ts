@@ -14,7 +14,7 @@ export interface Profile {
   sex: Sex;
   walkingAid: WalkingAid;
   /** Standing height (cm). Kept for the clinician summary. */
-  heightCm: number;
+  heightCm?: number;
 }
 
 export interface Screening {

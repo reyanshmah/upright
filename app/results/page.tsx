@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Lang } from "@/lib/i18n";
 import { NeedStart } from "@/components/NeedStart";
 import { ResultsView, type PlanState } from "@/components/ResultsView";
-import { clearSession, isSkipped, loadSession, updateSession, type SessionState } from "@/lib/session";
+import { clearSession, loadSession, updateSession, type SessionState } from "@/lib/session";
 import { setLangPref } from "@/lib/langPref";
 import { buildReportInput } from "@/lib/reportgen/clientInput";
 import type { ReportOutput } from "@/lib/reportgen/schema";
@@ -27,13 +27,7 @@ export default function Results() {
   const lang = s?.lang;
   useEffect(() => {
     if (!s) return;
-    // The service doesn't know the balance test yet; if balance flagged a risk, keep the on-device plan, which includes it.
-    const balanceRisk = !!s.balance && !isSkipped(s.balance) && !s.balance.tandemHeld10;
-    if (balanceRisk) {
-      setPlan({ state: "standard" });
-      updateSession({ reportSource: "local" });
-      return;
-    }
+    // The balance test is sent too (Nov 14), so every session can get a written plan.
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       setPlan({ state: "offline" });
       updateSession({ reportSource: "local" });
@@ -51,17 +45,22 @@ export default function Results() {
     })
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
-        const body = (await res.json()) as { report: ReportOutput; source: "model" | "regenerated" | "template" };
+        const body = (await res.json()) as {
+          report: ReportOutput;
+          source: "model" | "regenerated" | "template";
+          rejectedAttempts?: number;
+        };
         if (cancelled) return;
         updateSession({ reportSource: body.source });
         // Only a checked model plan replaces the on-device one; the server template matches it.
         if (body.source !== "template" && body.report?.familySteps?.length) setPlan({ state: "ai", output: body.report });
-        else setPlan({ state: "standard" });
+        // Say why: a template with no rejected drafts means the server has no API key.
+        else setPlan({ state: "standard", reason: (body.rejectedAttempts ?? 0) > 0 ? "checks" : "no_key" });
       })
       .catch(() => {
         if (cancelled) return; // a timeout still falls back below
         updateSession({ reportSource: "local" });
-        setPlan({ state: navigator.onLine === false ? "offline" : "standard" });
+        setPlan(navigator.onLine === false ? { state: "offline" } : { state: "standard", reason: "error" });
       })
       .finally(() => clearTimeout(timer));
     return () => {

@@ -6,6 +6,7 @@ import { STRINGS } from "@/lib/i18n";
 import { usePoseCamera, type FrameInfo } from "@/lib/pose/usePoseCamera";
 import { CameraStage } from "@/components/CameraStage";
 import { CameraControls } from "@/components/CameraControls";
+import { HeightInput, type HeightUnit } from "@/components/HeightInput";
 import {
   cmToFtIn,
   distanceM,
@@ -29,7 +30,7 @@ import type { Landmark } from "@/lib/signal/types";
 
 const TXT = {
   en: {
-    needHeight: "Height is missing. Go back to the profile and add it, or use a tape measure.",
+    needHeight: "This option uses the person's height as a ruler. Enter their height to continue.",
     start: "Start camera",
     stand: "Stand with your heels touching the front edge of the chair, facing sideways to the phone. Stand still.",
     setStart: "Set start",
@@ -43,7 +44,7 @@ const TXT = {
     approx: "This is a camera estimate, approximate within about 10–15 cm. A tape measure is more exact if you have one.",
   },
   es: {
-    needHeight: "Falta la estatura. Regrese al perfil y agréguela, o use una cinta métrica.",
+    needHeight: "Esta opción usa la estatura de la persona como regla. Escriba su estatura para continuar.",
     start: "Iniciar cámara",
     stand: "Párese con los talones tocando el borde delantero de la silla, de lado al teléfono. Quédese quieto/a.",
     setStart: "Fijar inicio",
@@ -65,18 +66,28 @@ type Stage = "idle" | "stand" | "walk";
 
 export function PoseMeasure({
   lang,
-  heightCm,
+  heightCm: savedHeightCm,
+  sex,
+  onHeight,
   onDone,
   onBack,
 }: {
   lang: Lang;
-  heightCm: number;
+  /** Asked here, only for this camera-estimate option (not in onboarding). */
+  heightCm: number | undefined;
+  sex: "female" | "male" | null;
+  onHeight: (cm: number) => void;
   onDone: (measuredM: number) => void;
   onBack: () => void;
 }) {
   const t = TXT[lang];
   const common = STRINGS[lang];
-  const heightOk = heightCm >= HEIGHT_MIN_CM && heightCm <= HEIGHT_MAX_CM;
+  const valid = (cm: number | null | undefined) => cm != null && cm >= HEIGHT_MIN_CM && cm <= HEIGHT_MAX_CM;
+  const [heightCm, setHeightCm] = useState<number | null>(valid(savedHeightCm) ? savedHeightCm! : null);
+  const [draftCm, setDraftCm] = useState<number | null>(null);
+  const [unit, setUnit] = useState<HeightUnit>(lang === "es" ? "metric" : "imperial");
+  const [heightTouched, setHeightTouched] = useState(false);
+  const heightOk = valid(heightCm);
 
   const latest = useRef<FrameInfo | null>(null);
   const ppm = useRef<number | null>(null);
@@ -118,7 +129,7 @@ export function PoseMeasure({
     const f = latest.current;
     if (!f?.main || !measurable(f.main) || !heightOk) return;
     const lms: Landmark[] = f.main;
-    const scale = pixelsPerMeter(lms, f.w, f.h, heightCm);
+    const scale = pixelsPerMeter(lms, f.w, f.h, heightCm!);
     if (!Number.isFinite(scale) || scale <= 0) return;
     ppm.current = scale;
     startX.current = footX(lms, f.w);
@@ -151,11 +162,29 @@ export function PoseMeasure({
   if (!heightOk) {
     return (
       <section className="stack-sm">
-        <div className="card card--risk">
-          <p>{t.needHeight}</p>
-        </div>
+        <p>{t.needHeight}</p>
+        <HeightInput
+          t={common}
+          unit={unit}
+          onUnit={setUnit}
+          cm={draftCm}
+          onCm={setDraftCm}
+          sex={sex}
+          showError={heightTouched && !valid(draftCm)}
+        />
         <div className="pinned__row">
           <button className="btn btn--secondary" onClick={onBack}>{common.back}</button>
+          <button
+            className="btn"
+            onClick={() => {
+              if (!valid(draftCm)) return setHeightTouched(true);
+              const cm = Math.round(draftCm!);
+              setHeightCm(cm);
+              onHeight(cm);
+            }}
+          >
+            {common.continue}
+          </button>
         </div>
       </section>
     );

@@ -13,28 +13,21 @@
  * standing on one foot lifts one ankle well above the other.
  * Stance checks are approximate; if the stance isn't recognized within a
  * grace period the hold starts anyway and is marked unverified.
+ *
+ * Movement is measured from the feet RELATIVE TO EACH OTHER (the gap between
+ * them, in shank lengths), never from where they sit in the picture, so the
+ * person holding the phone can move a little without ending a hold.
  */
 import { OneEuroFilter } from "../signal/oneEuro";
 import { LM, type Landmark } from "../signal/types";
+import { BALANCE } from "../signal/thresholds";
 
 export type Stage = 1 | 2 | 3 | 4;
 export const HOLD_S = 10;
 const STANCE_STABLE_MS = 800;
 const STANCE_GRACE_MS = 15_000;
-/**
- * A foot counts as moved only if its SMOOTHED position (median of the last
- * 500 ms) is > 0.55 shank lengths (~22 cm) from where it was at the start of
- * the hold (median of the first 500 ms), and stays that way for 500 ms.
- * Single-frame jitter and brief tracking glitches don't end the hold.
- */
-const MOVE_SCALE = 0.55;
-const MOVE_MS = 450;
-const REF_MS = 500;
-const WIN_MS = 450;
-const FOOT_VIS = 0.5;
-/** Moving within the first second of a hold = still settling in: restart the hold. */
-const SETTLE_MS = 1000;
-const LOST_MS = 1500;
+const { settledRel: SETTLED_REL, settledMs: SETTLED_MS, changedRel: CHANGED_REL, oneFootLift: ONE_FOOT_LIFT } = BALANCE;
+const { moveRel: MOVE_REL, moveMs: MOVE_MS, refMs: REF_MS, winMs: WIN_MS, footVis: FOOT_VIS, settleMs: SETTLE_MS, lostMs: LOST_MS, downLift: DOWN_LIFT, scaleWindow: SCALE_WINDOW } = BALANCE;
 
 export interface FrontFeat {
   t: number;
@@ -87,7 +80,7 @@ export class FrontFeatures {
 
     const med = (arr: number[], v: number) => {
       arr.push(v);
-      if (arr.length > 90) arr.shift();
+      if (arr.length > SCALE_WINDOW) arr.shift();
       const so = [...arr].sort((a, b) => a - b);
       return so[Math.floor(so.length / 2)];
     };
@@ -124,7 +117,7 @@ export class FrontFeatures {
 
 /** Does this frame look like the stance for this stage? (approximate) */
 export function stanceMatches(stage: Stage, f: FrontFeat): boolean {
-  const oneFoot = f.lift > 0.18;
+  const oneFoot = f.lift > ONE_FOOT_LIFT;
   if (stage === 4) return oneFoot;
   if (oneFoot) return false;
   if (stage === 1) return f.lateral >= 0.2;
@@ -156,6 +149,9 @@ export class BalanceDetector {
   private movedSince: number | null = null;
   private swayXs: number[] = [];
   private lastFeatT = 0;
+  /** The previous position's foot gap, to see that they changed position. */
+  private prevGap: { gapX: number; gapY: number } | null = null;
+  private stanceFrames: FrontFeat[] = [];
   heldS = 0;
   readonly results: StageResult[] = [];
   /** Stage start / hold start times, saved with the recording for replay. */
@@ -166,6 +162,7 @@ export class BalanceDetector {
     this.status = "waitStance";
     this.stageStartT = t;
     this.stableSince = null;
+    this.stanceFrames = [];
     this.ref = null;
     this.refFrames = [];
     this.recent = [];
@@ -180,16 +177,14 @@ export class BalanceDetector {
     if (this.status !== "waitStance" && this.status !== "holding") return this.status;
 
     if (!f) {
-      if (t - this.lastFeatT > LOST_MS) {
-        if (this.status === "holding") this.end(t, false);
-        else this.status = "lost";
-      }
+      // Out of view: a camera problem, not a balance failure.
+      if (t - this.lastFeatT > LOST_MS) this.status = "lost";
       return this.status;
     }
     this.lastFeatT = t;
 
     if (this.status === "waitStance") {
-      const ok = stanceMatches(this.stage, f);
+      const ok = this.inPosition(f, t);
       if (ok) this.stableSince ??= t;
       else this.stableSince = null;
       const stable = this.stableSince !== null && t - this.stableSince >= STANCE_STABLE_MS;
@@ -207,7 +202,8 @@ export class BalanceDetector {
 
     // Holding: feet must not move.
     this.heldS = (t - this.holdStartT) / 1000;
-    this.swayXs.push(f.hipMidX / f.hipW);
+    // Sway = hips relative to the feet, so a moving phone doesn't count as wobble.
+    this.swayXs.push((f.hipMidX - (f.a.x + f.b.x) / 2) / f.hipW);
     this.recent.push(f);
     while (this.recent.length && t - this.recent[0].t > WIN_MS) this.recent.shift();
 
@@ -223,17 +219,15 @@ export class BalanceDetector {
 
     const r = this.ref;
     const now = medianFeet(this.recent);
-    const dist = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y) / f.shank;
     let moved: boolean;
     if (this.stage === 4) {
-      // Planted foot must stay put; the raised foot must not come back down.
-      const plantedMoved = f.planted.vis >= FOOT_VIS && dist(now.planted, r.planted) > MOVE_SCALE;
-      const down = f.a.vis >= FOOT_VIS && f.b.vis >= FOOT_VIS && now.lift < 0.07;
-      moved = plantedMoved || down;
+      // The raised foot must not come back down (height difference between the feet).
+      moved = f.a.vis >= FOOT_VIS && f.b.vis >= FOOT_VIS && now.lift < DOWN_LIFT;
     } else {
-      const ma = f.a.vis >= FOOT_VIS ? dist(now.a, r.a) : 0;
-      const mb = f.b.vis >= FOOT_VIS ? dist(now.b, r.b) : 0;
-      moved = ma > MOVE_SCALE || mb > MOVE_SCALE;
+      // The gap between the feet must not change: a phone that moves shifts both
+      // feet together, a step changes the gap.
+      const bothSeen = f.a.vis >= FOOT_VIS && f.b.vis >= FOOT_VIS;
+      moved = bothSeen && Math.hypot(now.gapX - r.gapX, now.gapY - r.gapY) > MOVE_REL;
     }
     if (moved) {
       this.movedSince ??= t;
@@ -258,6 +252,33 @@ export class BalanceDetector {
     return this.status;
   }
 
+  /**
+   * Is the person in this stage's position? Works at any camera angle:
+   * - position 4: one foot clearly off the floor;
+   * - positions 1-3: both feet seen and settled; for 2-3, the gap between the
+   *   feet changed from the previous position's (they moved a foot).
+   * With no previous position to compare to, falls back to the front-view check.
+   */
+  private inPosition(f: FrontFeat, t: number): boolean {
+    this.stanceFrames.push(f);
+    while (this.stanceFrames.length && t - this.stanceFrames[0].t > SETTLED_MS) this.stanceFrames.shift();
+    if (this.stage === 4) return f.lift > ONE_FOOT_LIFT;
+    if (f.lift > ONE_FOOT_LIFT) return false;
+    // No previous position to compare to (position 1, or a stage run on its own):
+    // the original front-view check, which also works at 45 deg for feet side by side.
+    if (!this.prevGap) return stanceMatches(this.stage, f);
+    if (f.a.vis < FOOT_VIS || f.b.vis < FOOT_VIS) return false;
+    // Settled = not drifting: the first and second halves of the window agree
+    // (medians, so frame-to-frame jitter doesn't matter).
+    const fr = this.stanceFrames;
+    if (fr.length < 6 || t - fr[0].t < SETTLED_MS * 0.9) return false;
+    const half = Math.floor(fr.length / 2);
+    const m1 = medianFeet(fr.slice(0, half)), m2 = medianFeet(fr.slice(half));
+    if (Math.hypot(m1.gapX - m2.gapX, m1.gapY - m2.gapY) > SETTLED_REL) return false;
+    const m = medianFeet(fr);
+    return Math.hypot(m.gapX - this.prevGap.gapX, m.gapY - this.prevGap.gapY) > CHANGED_REL;
+  }
+
   private end(tEnd: number, completed: boolean) {
     const heldS = Math.max(0, Math.min(HOLD_S, (tEnd - this.holdStartT) / 1000));
     const xs = this.swayXs;
@@ -267,6 +288,7 @@ export class BalanceDetector {
       sway = Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
     }
     this.heldS = heldS;
+    if (this.ref) this.prevGap = { gapX: this.ref.gapX, gapY: this.ref.gapY };
     this.results.push({ stage: this.stage, heldS, completed, stanceVerified: this.stanceVerified, sway });
     this.status = completed ? "held" : "failed";
     this.events.push({ t: tEnd, type: "stageEnd", stage: this.stage });
@@ -284,8 +306,16 @@ function medianFeet(fs: FrontFeat[]) {
   });
   const planted = pt((f) => f.planted);
   const up = pt((f) => f.up);
-  const shank = med(fs.map((f) => f.shank));
-  return { a: pt((f) => f.a), b: pt((f) => f.b), planted, up, lift: Math.abs(planted.y - up.y) / shank };
+  return {
+    a: pt((f) => f.a),
+    b: pt((f) => f.b),
+    planted,
+    up,
+    // Each frame's own scale, so zooming in or out doesn't change these.
+    lift: med(fs.map((f) => Math.abs(f.planted.y - f.up.y) / f.shank)),
+    gapX: med(fs.map((f) => (f.b.x - f.a.x) / f.shank)),
+    gapY: med(fs.map((f) => (f.b.y - f.a.y) / f.shank)),
+  };
 }
 
 /** CDC: cannot hold tandem (stage 3) for 10 s = increased fall risk. */
