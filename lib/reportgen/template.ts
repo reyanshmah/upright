@@ -5,6 +5,7 @@
  * checkReport (tested on all 20 fixtures).
  */
 import { STRINGS } from "../i18n";
+import { exerciseCard } from "../exercises";
 import { STEP_TEXT } from "../report";
 import type { WriterFacts } from "./facts";
 import type { ReportOutput } from "./schema";
@@ -78,5 +79,6 @@ export function templateReport(f: WriterFacts): ReportOutput {
     familySummary: summary.join(" "),
     familySteps: f.stepOrder.map((k) => ({ ...STEP_TEXT[lang][k] })),
     clinicianSummary: clinician(f),
+    exercises: f.suggestedExercises.map((id) => exerciseCard(id, f.ctx, lang)),
   };
 }

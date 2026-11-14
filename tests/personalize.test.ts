@@ -135,6 +135,7 @@ describe("why the standard plan was used", () => {
       familySummary: "You have a disease. Take 5 mg.",
       familySteps: [{ title: "x", body: "y" }],
       clinicianSummary: "z",
+      exercises: [],
     }));
     expect(unsafe.source).toBe("template");
     expect(unsafe.modelError).toBeUndefined();
@@ -143,7 +144,7 @@ describe("why the standard plan was used", () => {
 });
 
 describe("exercises for this person (Nov 14)", () => {
-  it("picks chair rise for weak legs, the failed stance for balance, and both languages exist", async () => {
+  it("the app's own pick follows the results, in both languages", async () => {
     const { exercisesFor } = await import("../lib/exercises");
     const base: PlanContext = {
       screening: { unsteady: false, worry: false, fallen: false, fallCount: null, injured: null },
@@ -151,7 +152,7 @@ describe("exercises for this person (Nov 14)", () => {
       balance: { tandemHeld10: true, failedStage: null, failedHeldSec: null },
     };
     const legs = exercisesFor({ ...base, chairScore: "8", chairBelow: true }, "en");
-    expect(legs.cards.map((c) => c.id)).toEqual(["chair_rise"]);
+    expect(legs.cards[0].id).toBe("chair_rise");
     expect(legs.cards[0].why).toContain("8 times");
     expect(legs.cards[0].dose).toContain("10 to 15");
     const bal = exercisesFor({ ...base, balance: { tandemHeld10: false, failedStage: 3, failedHeldSec: "6.4" } }, "en");
@@ -162,7 +163,76 @@ describe("exercises for this person (Nov 14)", () => {
     expect(good.cards[0].id).toBe("chair_rise");
     expect(good.safety.join(" ")).not.toContain("fisioterapeuta");
     const both = exercisesFor({ ...base, armsUsed: true, balance: { tandemHeld10: false, failedStage: 2, failedHeldSec: "4.0" }, walkingAid: "walker" }, "en");
-    expect(both.cards.map((c) => c.id)).toEqual(["chair_rise", "balance_2"]);
+    expect(both.cards.map((c) => c.id)).toEqual(expect.arrayContaining(["seated_march", "chair_rise", "balance_2"]));
     expect(both.safety.join(" ")).toContain("walker");
+  });
+});
+
+describe("exercise library and the AI's exercises", () => {
+  const baseCtx: PlanContext = {
+    screening: { unsteady: false, worry: false, fallen: false, fallCount: null, injured: null },
+    walkingAid: "none", tugSec: "9.8", tugAtRisk: false, chairScore: "13", chairNorm: "12", chairBelow: false, armsUsed: false,
+    balance: { tandemHeld10: true, failedStage: null, failedHeldSec: null },
+  };
+  it("every library entry, in both languages, passes the number and phrase checks and names a support", async () => {
+    const { LIBRARY, EXERCISE_IDS, libraryNumbers } = await import("../lib/exercises");
+    const { checkNumbers, checkPhrases } = await import("../lib/reportgen/check");
+    const nums = libraryNumbers(EXERCISE_IDS);
+    const set = { seconds: nums, stands: nums, meters: new Set<string>(), years: new Set<string>(), bare: nums };
+    for (const lang of ["en", "es"] as const) {
+      for (const id of EXERCISE_IDS) {
+        const e = LIBRARY[lang][id];
+        const text = [e.title, ...e.steps, e.dose, e.easier].join("\n");
+        expect(checkNumbers(text, lang, set), `${lang} ${id}`).toEqual([]);
+        expect(checkPhrases(text, lang), `${lang} ${id}`).toEqual([]);
+        expect(e.steps.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it("eligible exercises depend on the results (no one-foot stand for someone who failed an easier stance)", async () => {
+    const { eligibleIds, suggestedIds } = await import("../lib/exercises");
+    const failed = { ...baseCtx, balance: { tandemHeld10: false, failedStage: 2, failedHeldSec: "4.0" } };
+    const ids = eligibleIds(failed);
+    expect(ids).toEqual(expect.arrayContaining(["balance_2", "balance_1"]));
+    expect(ids).not.toContain("balance_4");
+    expect(ids).not.toContain("tandem_walk_counter");
+    expect(eligibleIds(baseCtx)).toContain("balance_4");
+    expect(eligibleIds({ ...baseCtx, armsUsed: true })).toContain("seated_march");
+    for (const c of [baseCtx, failed, { ...baseCtx, chairBelow: true, balance: null }]) {
+      const s = suggestedIds(c);
+      expect(s.length).toBeGreaterThanOrEqual(3);
+      expect(s.length).toBeLessThanOrEqual(4);
+      expect(s.every((x) => eligibleIds(c).includes(x))).toBe(true);
+    }
+  });
+
+  it("a writer's exercises are accepted from the library and rejected when invented or unsafe", async () => {
+    const { checkReport } = await import("../lib/reportgen/check");
+    const base = load(files[0]);
+    const input: ReportInput = { ...base, balance: BALANCE.tandemFail, walkingAid: "walker" };
+    const { facts, allowed } = writerFacts(input);
+    const good = templateReport(facts);
+    expect(checkReport(good, facts, allowed)).toEqual([]);
+    expect(good.exercises.length).toBeGreaterThanOrEqual(3);
+    const withEx = (e: Partial<(typeof good.exercises)[number]>, i = 0) => ({ ...good, exercises: good.exercises.map((x, k) => (k === i ? { ...x, ...e } : x)) });
+    // an exercise that is not allowed for this person (one-foot stand after failing stage 3)
+    expect(checkReport(withEx({ id: "balance_4" }), facts, allowed).join(" ")).toContain("not in the approved list");
+    // an invented number of repetitions
+    expect(checkReport(withEx({ dose: "Repeat 40 times." }), facts, allowed).join(" ")).toContain("40");
+    // medicine, promise and missing support
+    expect(checkReport(withEx({ why: "This will prevent falls." }), facts, allowed).join(" ")).toContain("promise");
+    expect(checkReport(withEx({ steps: ["Do it fast.", "Do it again."] , dose: "Repeat 10 times.", why: "Helps."}), facts, allowed).join(" ")).toContain("support");
+    // too few
+    expect(checkReport({ ...good, exercises: good.exercises.slice(0, 1) }, facts, allowed).join(" ")).toContain("need 3 or 4");
+  });
+
+  it("different people are offered different exercises in the writer's facts", () => {
+    const base = load(files[0]);
+    const a = writerFacts({ ...base, balance: BALANCE.tandemFail, walkingAid: "walker" }).facts;
+    const b = writerFacts({ ...base, balance: BALANCE.allHeld, walkingAid: "none" }).facts;
+    expect(a.suggestedExercises).toContain("balance_3");
+    expect(b.suggestedExercises).not.toContain("balance_3");
+    expect(a.suggestedExercises).not.toEqual(b.suggestedExercises);
   });
 });

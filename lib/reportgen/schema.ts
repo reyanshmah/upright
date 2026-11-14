@@ -4,6 +4,7 @@
  * name, exact age, height, video or landmark stream is rejected, not ignored.
  * Ranges follow MASTER.md ("a TUG under 2 s or over 60 s, more than 40 stands").
  */
+import { EXERCISE_IDS } from "../exercises";
 import { z } from "zod";
 import { CHAIR_STAND_NORMS, scoreChairStand, tugAtRisk } from "../signal/thresholds";
 import { bandAge } from "../sessionFile";
@@ -127,6 +128,17 @@ export const ReportOutputSchema = z.object({
   familySteps: z.array(z.object({ title: z.string(), body: z.string() })),
   /** A short factual summary for the doctor, always in English. */
   clinicianSummary: z.string(),
+  /** 3 or 4 exercises from the approved library (FACTS.eligibleExercises), written for this person. */
+  exercises: z.array(
+    z.object({
+      id: z.enum(EXERCISE_IDS),
+      title: z.string(),
+      why: z.string(),
+      steps: z.array(z.string()),
+      dose: z.string(),
+      easier: z.string(),
+    }),
+  ),
 });
 
 export type ReportOutput = z.infer<typeof ReportOutputSchema>;

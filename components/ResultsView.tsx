@@ -88,6 +88,8 @@ export function ResultsView({
   const steps = stepOrder(f);
   const ctx = planContext(s);
   const exPlan = exercisesFor(ctx, lang);
+  // The checked AI exercises (picked and written for this person) replace the app's own pick.
+  const exCards = plan.state === "ai" && plan.output.exercises?.length ? plan.output.exercises : exPlan.cards;
   const yesCount = [s.screening.unsteady, s.screening.worry, s.screening.fallen].filter(Boolean).length;
   const tug = tugMeasured(s.tug);
   const chair = chairMeasured(s.chair);
@@ -221,7 +223,7 @@ export function ResultsView({
               ))}
             </ul>
           </div>
-          {exPlan.cards.map((c) => (
+          {exCards.map((c) => (
             <article className="card exercise" key={c.id}>
               <h4>{c.title}</h4>
               <p className="plan-detail">
@@ -235,7 +237,7 @@ export function ResultsView({
               <p>
                 <b>{c.dose}</b>
               </p>
-              {c.easier && <p className="muted">{c.easier}</p>}
+              {c.easier ? <p className="muted">{c.easier}</p> : null}
             </article>
           ))}
         </section>

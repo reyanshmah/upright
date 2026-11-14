@@ -13,6 +13,7 @@
  *  - Risk: when any risk flag is set, the exact disclaimer and a doctor visit
  *    must both appear.
  */
+import { libraryNumbers, type ExerciseId } from "../exercises";
 import { STRINGS, type Lang } from "../i18n";
 import type { AllowedNumbers, WriterFacts } from "./facts";
 import type { ReportOutput } from "./schema";
@@ -115,6 +116,41 @@ export function checkPhrases(text: string, lang: Lang): string[] {
   return problems;
 }
 
+const SUPPORT: Record<Lang, RegExp> = {
+  en: /\b(counter|table|chair|wall|someone|helper|rail)\b/i,
+  es: /(mostrador|mesa|silla|pared|alguien|ayuda|barandal|pasamanos)/i,
+};
+
+/** Problems with the exercises: only library ids for this person, library numbers, a support in each, no diagnosis or promises. */
+export function checkExercises(out: ReportOutput, facts: WriterFacts, allowed: AllowedNumbers): string[] {
+  const lang = facts.lang;
+  const problems: string[] = [];
+  const list = out.exercises ?? [];
+  if (list.length < 3 || list.length > 4) problems.push(`exercises: need 3 or 4, got ${list.length}`);
+  const seen = new Set<string>();
+  const ok = new Set<string>(facts.eligibleExercises);
+  const lib = libraryNumbers(facts.eligibleExercises as ExerciseId[]);
+  const merged: AllowedNumbers = {
+    seconds: new Set([...allowed.seconds, ...lib]),
+    stands: new Set([...allowed.stands, ...lib]),
+    meters: allowed.meters,
+    years: allowed.years,
+    bare: new Set([...allowed.bare, ...lib]),
+  };
+  for (const e of list) {
+    if (!ok.has(e.id)) problems.push(`exercises: "${e.id}" is not in the approved list for this person`);
+    if (seen.has(e.id)) problems.push(`exercises: "${e.id}" is repeated`);
+    seen.add(e.id);
+    if (e.steps.length < 2 || e.steps.length > 9) problems.push(`exercises: "${e.id}" needs 2 to 9 steps`);
+    const text = [e.title, e.why, ...e.steps, e.dose, e.easier].join("\n");
+    if (text.length > 2500) problems.push(`exercises: "${e.id}" is too long`);
+    if (!SUPPORT[lang].test(text)) problems.push(`exercises: "${e.id}" must name its support (counter, chair, wall or helper)`);
+    problems.push(...checkNumbers(text, lang, merged).map((p) => `exercises ${e.id}: ${p}`));
+    problems.push(...checkPhrases(text, lang).map((p) => `exercises ${e.id}: ${p}`));
+  }
+  return problems;
+}
+
 /** All problems with a model-written report. Empty = it may be shown. */
 export function checkReport(out: ReportOutput, facts: WriterFacts, allowed: AllowedNumbers): string[] {
   const lang = facts.lang;
@@ -126,6 +162,7 @@ export function checkReport(out: ReportOutput, facts: WriterFacts, allowed: Allo
     ...checkNumbers(clinician, "en", allowed).map((p) => `clinician: ${p}`),
     ...checkPhrases(clinician, "en").map((p) => `clinician: ${p}`),
   ];
+  problems.push(...checkExercises(out, facts, allowed));
   if (!out.familySteps.length) problems.push("family: no action steps");
   if (out.familySteps.length > 6) problems.push("family: more than 6 steps");
   if (family.length > 3000 || clinician.length > 2000) problems.push("too long");

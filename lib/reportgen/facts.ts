@@ -4,7 +4,7 @@
  * logs and fps are full of numbers it must never repeat), and the number check
  * allows only these values, in the exact string form the engine shows them.
  */
-import { exercisesFor } from "../exercises";
+import { eligibleIds, suggestedIds, type ExerciseId } from "../exercises";
 import { focusAreas, stepDetail, stepOrder, type Focus, type PlanContext, type ReportFacts, type StepKey } from "../report";
 import { bandAge } from "../sessionFile";
 import { chairStandNorm, scoreChairStand, TUG_RISK_SECONDS } from "../signal/thresholds";
@@ -55,8 +55,12 @@ export interface WriterFacts {
   higherRisk: boolean;
   /** What this person's plan should focus on, from their own results. */
   focus: Focus[];
-  /** The exercises the app shows under the plan (fixed text; the writer must not describe routines). */
-  exercises: string[];
+  /** The exercise library entries that are safe for this person; the writer may only pick from these. */
+  eligibleExercises: ExerciseId[];
+  /** The app's own pick, in order of importance (a starting point, not a rule). */
+  suggestedExercises: ExerciseId[];
+  /** Plan inputs (for the template and the app); left out of the text the writer sees. */
+  ctx: PlanContext;
   /** The family plan steps, in order. */
   stepOrder: StepKey[];
   /** One note per step tying it to this person's results (in the FACTS language). */
@@ -167,7 +171,9 @@ export function writerFacts(input: ReportInput): { facts: WriterFacts; allowed: 
     walkingAid: input.walkingAid ?? null,
     higherRisk: reportFacts.higherRisk,
     focus: focusAreas(ctx),
-    exercises: exercisesFor(ctx, input.lang).cards.map((c) => c.id),
+    ctx,
+    eligibleExercises: eligibleIds(ctx),
+    suggestedExercises: suggestedIds(ctx),
     stepOrder: order,
     personalNotes,
   };
