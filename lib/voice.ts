@@ -216,6 +216,8 @@ export function unlockAudio(lang?: Lang): void {
  * from Settings (questions, "Read this screen", etc.).
  */
 export function speakText(lang: Lang, text: string): void {
+  // One voice at a time: a read-aloud never talks over a cue (or another read-aloud).
+  stopCues();
   try {
     speak(lang, text, getVoiceRate());
   } catch {
@@ -243,6 +245,9 @@ function speak(lang: Lang, text: string, rate: number, onEnd?: () => void): void
  * file, i.e. when the word is actually heard (see MASTER.md "Cue timing").
  */
 export async function playCue(lang: Lang, id: CueId, text: string): Promise<number> {
+  // One voice at a time: a new cue replaces whatever is still playing, so two
+  // recordings or a recording and the browser voice never overlap.
+  stopCues();
   const rate = rateFor(id);
   if (ctx && ctx.state === "running") {
     const [clip, buf] = await Promise.all([loadBuffer(lang, id), bufferAt(lang, id, rate)]);
@@ -281,6 +286,7 @@ export async function playCue(lang: Lang, id: CueId, text: string): Promise<numb
 
 /** Speaks/plays a cue and resolves when it has finished (max `maxMs` at normal speed). */
 export async function playCueAndWait(lang: Lang, id: CueId, text: string, maxMs = 15000): Promise<void> {
+  stopCues();
   const rate = rateFor(id);
   const limit = maxMs / rate;
   if (ctx && ctx.state === "running") {
