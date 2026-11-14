@@ -218,11 +218,14 @@ describe("exercise library and the AI's exercises", () => {
     const withEx = (e: Partial<(typeof good.exercises)[number]>, i = 0) => ({ ...good, exercises: good.exercises.map((x, k) => (k === i ? { ...x, ...e } : x)) });
     // an exercise that is not allowed for this person (one-foot stand after failing stage 3)
     expect(checkReport(withEx({ id: "balance_4" }), facts, allowed).join(" ")).toContain("not in the approved list");
-    // an invented number of repetitions
-    expect(checkReport(withEx({ dose: "Repeat 40 times." }), facts, allowed).join(" ")).toContain("40");
-    // medicine, promise and missing support
+    // an invented number of repetitions in the tip
+    expect(checkReport(withEx({ tip: "Repeat 40 times." }), facts, allowed).join(" ")).toContain("40");
+    // a library number is fine; a minute or a weight is not
+    expect(checkReport(withEx({ tip: "Hold for up to 10 seconds." }), facts, allowed)).toEqual([]);
+    expect(checkReport(withEx({ tip: "Use a 5 kg weight." }), facts, allowed).join(" ")).toContain("kg");
+    // promise wording and an empty reason
     expect(checkReport(withEx({ why: "This will prevent falls." }), facts, allowed).join(" ")).toContain("promise");
-    expect(checkReport(withEx({ steps: ["Do it fast.", "Do it again."] , dose: "Repeat 10 times.", why: "Helps."}), facts, allowed).join(" ")).toContain("support");
+    expect(checkReport(withEx({ why: "" }), facts, allowed).join(" ")).toContain("no reason");
     // too few
     expect(checkReport({ ...good, exercises: good.exercises.slice(0, 1) }, facts, allowed).join(" ")).toContain("need 3 or 4");
   });

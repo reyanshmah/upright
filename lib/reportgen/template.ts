@@ -79,6 +79,9 @@ export function templateReport(f: WriterFacts): ReportOutput {
     familySummary: summary.join(" "),
     familySteps: f.stepOrder.map((k) => ({ ...STEP_TEXT[lang][k] })),
     clinicianSummary: clinician(f),
-    exercises: f.suggestedExercises.map((id) => exerciseCard(id, f.ctx, lang)),
+    exercises: f.suggestedExercises.map((id) => {
+      const c = exerciseCard(id, f.ctx, lang);
+      return { id, why: c.why, tip: "" };
+    }),
   };
 }

@@ -2,7 +2,7 @@
 
 import { STRINGS, type Lang } from "../lib/i18n";
 import { chairMeasured, isSkipped, tugMeasured, type SessionState } from "../lib/session";
-import { exercisesFor } from "../lib/exercises";
+import { cardFromWriter, exercisesFor } from "../lib/exercises";
 import { exerciseTitle, planContext, reportFacts, stepDetail, stepOrder, STEP_TEXT } from "../lib/report";
 import { TUG_RISK_SECONDS } from "../lib/signal/thresholds";
 import { AppShell } from "./AppShell";
@@ -89,7 +89,7 @@ export function ResultsView({
   const ctx = planContext(s);
   const exPlan = exercisesFor(ctx, lang);
   // The checked AI exercises (picked and written for this person) replace the app's own pick.
-  const exCards = plan.state === "ai" && plan.output.exercises?.length ? plan.output.exercises : exPlan.cards;
+  const exCards = plan.state === "ai" && plan.output.exercises?.length ? plan.output.exercises.map((w) => cardFromWriter(w, lang)) : exPlan.cards;
   const yesCount = [s.screening.unsteady, s.screening.worry, s.screening.fallen].filter(Boolean).length;
   const tug = tugMeasured(s.tug);
   const chair = chairMeasured(s.chair);
@@ -238,6 +238,11 @@ export function ResultsView({
                 <b>{c.dose}</b>
               </p>
               {c.easier ? <p className="muted">{c.easier}</p> : null}
+              {c.tip ? (
+                <p className="plan-detail">
+                  <b>{t.planForYou}</b> {c.tip}
+                </p>
+              ) : null}
             </article>
           ))}
         </section>

@@ -40,6 +40,8 @@ export interface ExerciseCard {
   dose: string;
   /** Easier start ("" when there is none). */
   easier: string;
+  /** A tip for this person's situation (walking aid, side, support); "" when there is none. */
+  tip: string;
 }
 
 export interface ExercisePlan {
@@ -425,7 +427,13 @@ function defaultWhy(id: ExerciseId, c: PlanContext, lang: Lang): string {
 /** One library exercise as a card (the library's own words). */
 export function exerciseCard(id: ExerciseId, c: PlanContext, lang: Lang): ExerciseCard {
   const e = LIBRARY[lang][id];
-  return { id, title: e.title, why: defaultWhy(id, c, lang), steps: [...e.steps], dose: e.dose, easier: e.easier };
+  return { id, title: e.title, why: defaultWhy(id, c, lang), steps: [...e.steps], dose: e.dose, easier: e.easier, tip: "" };
+}
+
+/** A library exercise with the writer's why and tip (the steps and numbers stay the library's). */
+export function cardFromWriter(w: { id: ExerciseId; why: string; tip: string }, lang: Lang): ExerciseCard {
+  const e = LIBRARY[lang][w.id];
+  return { id: w.id, title: e.title, why: w.why, steps: [...e.steps], dose: e.dose, easier: e.easier, tip: w.tip };
 }
 
 /** The exercises shown when the writer is off or fails, plus the safety lines (always app-written). */

@@ -116,12 +116,7 @@ export function checkPhrases(text: string, lang: Lang): string[] {
   return problems;
 }
 
-const SUPPORT: Record<Lang, RegExp> = {
-  en: /\b(counter|table|chair|wall|someone|helper|rail)\b/i,
-  es: /(mostrador|mesa|silla|pared|alguien|ayuda|barandal|pasamanos)/i,
-};
-
-/** Problems with the exercises: only library ids for this person, library numbers, a support in each, no diagnosis or promises. */
+/** Problems with the exercises: only library ids for this person, and a clean why and tip (the steps are the library's). */
 export function checkExercises(out: ReportOutput, facts: WriterFacts, allowed: AllowedNumbers): string[] {
   const lang = facts.lang;
   const problems: string[] = [];
@@ -141,10 +136,9 @@ export function checkExercises(out: ReportOutput, facts: WriterFacts, allowed: A
     if (!ok.has(e.id)) problems.push(`exercises: "${e.id}" is not in the approved list for this person`);
     if (seen.has(e.id)) problems.push(`exercises: "${e.id}" is repeated`);
     seen.add(e.id);
-    if (e.steps.length < 2 || e.steps.length > 9) problems.push(`exercises: "${e.id}" needs 2 to 9 steps`);
-    const text = [e.title, e.why, ...e.steps, e.dose, e.easier].join("\n");
-    if (text.length > 2500) problems.push(`exercises: "${e.id}" is too long`);
-    if (!SUPPORT[lang].test(text)) problems.push(`exercises: "${e.id}" must name its support (counter, chair, wall or helper)`);
+    if (!e.why.trim()) problems.push(`exercises: "${e.id}" has no reason`);
+    const text = [e.why, e.tip].join("\n");
+    if (text.length > 700) problems.push(`exercises: "${e.id}" is too long`);
     problems.push(...checkNumbers(text, lang, merged).map((p) => `exercises ${e.id}: ${p}`));
     problems.push(...checkPhrases(text, lang).map((p) => `exercises ${e.id}: ${p}`));
   }

@@ -128,15 +128,16 @@ export const ReportOutputSchema = z.object({
   familySteps: z.array(z.object({ title: z.string(), body: z.string() })),
   /** A short factual summary for the doctor, always in English. */
   clinicianSummary: z.string(),
-  /** 3 or 4 exercises from the approved library (FACTS.eligibleExercises), written for this person. */
+  /**
+   * 3 or 4 exercises from the approved library (FACTS.eligibleExercises), picked for this person.
+   * The writer adds why it fits them and a tip for their situation; the steps and numbers
+   * always come from the library (lib/exercises.ts), never from the model.
+   */
   exercises: z.array(
     z.object({
       id: z.enum(EXERCISE_IDS),
-      title: z.string(),
       why: z.string(),
-      steps: z.array(z.string()),
-      dose: z.string(),
-      easier: z.string(),
+      tip: z.string(),
     }),
   ),
 });
