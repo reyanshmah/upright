@@ -4,7 +4,7 @@ import "../styles/tokens.css";
 import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";
 import { resolveDefaultTheme, THEME_IDS, THEME_STORAGE_KEY, THEMES } from "@/lib/themes";
-import { FONT_KEY, FONT_PREFS, TEXT_KEY, TEXT_SIZES } from "@/lib/displayPrefs";
+import { FONT_KEY, FONT_PREFS, GUIDE_KEY, SPACING_KEY, TEXT_KEY, TEXT_SCALE_KEY, TEXT_SCALE_MAX, TEXT_SCALE_MIN } from "@/lib/displayPrefs";
 
 // Self-hosted at build time; the CSS variables are the ones styles/tokens.css names.
 const atkinson = Atkinson_Hyperlegible({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-atkinson", display: "swap" });
@@ -34,14 +34,14 @@ export const viewport: Viewport = {
 
 /**
  * Runs before first paint: the saved theme if valid, else the default from the
- * system's dark-mode and more-contrast settings; then the saved text size and
- * font (lib/displayPrefs.ts). With no saved theme, it also follows the phone
+ * system's dark-mode and more-contrast settings; then the saved text scale,
+ * font, line spacing and reading guide (lib/displayPrefs.ts). With no saved theme, it also follows the phone
  * live when dark mode or more-contrast is switched. Storage can throw (private mode, blocked site
  * data), so every access is guarded.
  */
 const themeScript = `(function(){var d=document.documentElement,g=function(k){try{return localStorage.getItem(k)}catch(e){return null}},t=g(${JSON.stringify(
   THEME_STORAGE_KEY,
-)});if(${JSON.stringify(THEME_IDS)}.indexOf(t)<0){var m=function(q){try{return window.matchMedia(q).matches}catch(e){return false}};t=(${resolveDefaultTheme.toString()})(m("(prefers-color-scheme: dark)"),m("(prefers-contrast: more)"))}d.setAttribute("data-theme",t);var x=g(${JSON.stringify(TEXT_KEY)});d.setAttribute("data-text",${JSON.stringify(TEXT_SIZES)}.indexOf(x)<0?"standard":x);var f=g(${JSON.stringify(FONT_KEY)});d.setAttribute("data-font",${JSON.stringify(FONT_PREFS)}.indexOf(f)<0?"standard":f);try{var q=[window.matchMedia("(prefers-color-scheme: dark)"),window.matchMedia("(prefers-contrast: more)")];q.forEach(function(x){x.addEventListener("change",function(){if(${JSON.stringify(THEME_IDS)}.indexOf(g(${JSON.stringify(THEME_STORAGE_KEY)}))<0)d.setAttribute("data-theme",(${resolveDefaultTheme.toString()})(q[0].matches,q[1].matches))})})}catch(e){}})();`;
+)});if(${JSON.stringify(THEME_IDS)}.indexOf(t)<0){var m=function(q){try{return window.matchMedia(q).matches}catch(e){return false}};t=(${resolveDefaultTheme.toString()})(m("(prefers-color-scheme: dark)"),m("(prefers-contrast: more)"))}d.setAttribute("data-theme",t);var s=Number(g(${JSON.stringify(TEXT_SCALE_KEY)}));if(!(s>=${TEXT_SCALE_MIN}&&s<=${TEXT_SCALE_MAX}))s=g(${JSON.stringify(TEXT_KEY)})==="large"?1.2:1;d.style.setProperty("--text-scale",String(s));d.setAttribute("data-spacing",g(${JSON.stringify(SPACING_KEY)})==="wide"?"wide":"normal");d.setAttribute("data-guide",g(${JSON.stringify(GUIDE_KEY)})==="on"?"on":"off");var f=g(${JSON.stringify(FONT_KEY)});d.setAttribute("data-font",${JSON.stringify(FONT_PREFS)}.indexOf(f)<0?"standard":f);try{var q=[window.matchMedia("(prefers-color-scheme: dark)"),window.matchMedia("(prefers-contrast: more)")];q.forEach(function(x){x.addEventListener("change",function(){if(${JSON.stringify(THEME_IDS)}.indexOf(g(${JSON.stringify(THEME_STORAGE_KEY)}))<0)d.setAttribute("data-theme",(${resolveDefaultTheme.toString()})(q[0].matches,q[1].matches))})})}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

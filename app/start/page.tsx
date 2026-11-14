@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STRINGS, type Lang } from "@/lib/i18n";
 import { detectLang, setLangPref } from "@/lib/langPref";
@@ -8,56 +9,43 @@ import { AppShell, PinnedRow } from "@/components/AppShell";
 import { ChoiceGroup, Field } from "@/components/Form";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/StatusBadge";
+import { HeightInput, type HeightUnit } from "@/components/HeightInput";
+import { HEIGHT_MAX_CM, HEIGHT_MIN_CM } from "@/lib/measure";
+import { speakText } from "@/lib/voice";
 import {
   loadSession,
   saveSession,
   screenedAtRisk,
   STEADI_MIN_AGE,
   type FallCount,
-  type Runner,
   type Screening,
   type WalkingAid,
 } from "@/lib/session";
 import { chairStandNorm, type Sex } from "@/lib/signal/thresholds";
 
 /**
- * Onboarding, one topic per screen. The wording follows who is holding the
- * phone: "you" for someone testing themselves, "they" for a helper. The CDC
- * STEADI questions are always shown word for word; a helper is asked to read
- * them out loud to the person and tap the answer (that is how STEADI is given).
+ * Onboarding, one topic per screen. There are always two people: the person
+ * being checked and a helper who holds the phone, so the wording speaks to the
+ * helper. It opens with what Upright does and how the data stays safe. The CDC
+ * STEADI questions are shown word for word; the helper reads them out loud to
+ * the person and taps the answer (that is how STEADI is given).
  */
-type Step = "who" | "about" | "body" | "q1" | "q2" | "q3" | "summary";
-const ORDER: Step[] = ["who", "about", "body", "q1", "q2", "q3", "summary"];
+type Step = "welcome" | "about" | "body" | "q1" | "q2" | "q3" | "summary";
+const ORDER: Step[] = ["welcome", "about", "body", "q1", "q2", "q3", "summary"];
 const COUNTED = 6; // steps before the summary
 
 type YesNo = boolean | null;
 
-function speak(text: string, lang: Lang) {
-  try {
-    const s = window.speechSynthesis;
-    s.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === "es" ? "es-US" : "en-US";
-    u.rate = 0.9;
-    s.speak(u);
-  } catch {
-    /* no speech on this browser */
-  }
-}
-
 export default function Start() {
   const router = useRouter();
   const [lang, setLang] = useState<Lang | null>(null);
-  const [step, setStep] = useState<Step>("who");
-  const [runner, setRunner] = useState<Runner | null>(null);
+  const [step, setStep] = useState<Step>("welcome");
   const [firstName, setFirstName] = useState("");
   const [ageText, setAgeText] = useState("");
   const [sex, setSex] = useState<Sex | null>(null);
   const [aid, setAid] = useState<WalkingAid | null>(null);
-  const [heightUnit, setHeightUnit] = useState<"imperial" | "metric">("imperial");
-  const [ft, setFt] = useState("");
-  const [inch, setInch] = useState("");
-  const [cmText, setCmText] = useState("");
+  const [heightUnit, setHeightUnit] = useState<HeightUnit>("imperial");
+  const [heightCm, setHeightCm] = useState<number | null>(null);
   const [unsteady, setUnsteady] = useState<YesNo>(null);
   const [worry, setWorry] = useState<YesNo>(null);
   const [fallen, setFallen] = useState<YesNo>(null);
@@ -75,13 +63,11 @@ export default function Start() {
     const prev = new URLSearchParams(window.location.search).get("resume") ? loadSession() : null;
     if (prev) {
       setLang(prev.lang);
-      setRunner(prev.runner);
       setFirstName(prev.profile.firstName);
       setAgeText(String(prev.profile.age));
       setSex(prev.profile.sex);
       setAid(prev.profile.walkingAid);
-      setHeightUnit("metric");
-      setCmText(String(prev.profile.heightCm));
+      setHeightCm(prev.profile.heightCm);
       setUnsteady(prev.screening.unsteady);
       setWorry(prev.screening.worry);
       setFallen(prev.screening.fallen);
@@ -98,7 +84,7 @@ export default function Start() {
 
   if (!lang) return null;
   const t = STRINGS[lang];
-  const helper = runner === "helper";
+  const helper = true; // a helper always holds the phone
   const name = firstName.trim();
   const onLang = (l: Lang) => {
     setLangPref(l);
@@ -107,13 +93,10 @@ export default function Start() {
 
   const age = Number(ageText);
   const ageValid = ageText !== "" && Number.isInteger(age) && age >= 18 && age <= 110;
-  const heightCm =
-    heightUnit === "metric" ? Number(cmText) : (Number(ft || 0) * 12 + Number(inch || 0)) * 2.54;
-  const heightEntered = heightUnit === "metric" ? cmText !== "" : ft !== "";
-  const heightValid = heightEntered && heightCm >= 120 && heightCm <= 215;
+  const heightValid = heightCm !== null && heightCm >= HEIGHT_MIN_CM && heightCm <= HEIGHT_MAX_CM;
 
   const stepOk: Record<Step, boolean> = {
-    who: runner !== null,
+    welcome: true,
     about: ageValid && sex !== null,
     body: heightValid && aid !== null,
     q1: unsteady !== null,
@@ -139,8 +122,8 @@ export default function Start() {
       };
       saveSession({
         lang,
-        runner: runner!,
-        profile: { firstName: name, age, sex: sex!, walkingAid: aid!, heightCm: Math.round(heightCm) },
+        runner: "helper",
+        profile: { firstName: name, age, sex: sex!, walkingAid: aid!, heightCm: Math.round(heightCm!) },
         screening,
         createdAt: new Date().toISOString(),
       });
@@ -161,7 +144,7 @@ export default function Start() {
       <div className="ask-row">
         {helper ? <p className="ask">{name ? t.askName(name) : t.askThem}</p> : <span />}
         {canSpeak && (
-          <button type="button" className="linkish linkish--icon" onClick={() => speak(text, lang)}>
+          <button type="button" className="linkish linkish--icon" onClick={() => speakText(lang, text)}>
             <Icon name="speaker" />
             <span>{t.readAloud}</span>
           </button>
@@ -205,25 +188,52 @@ export default function Start() {
         </div>
       )}
 
-      {step === "who" && (
+      {step === "welcome" && (
         <section className="stack">
-          <ChoiceGroup
-            legend={t.whoTitle}
-            legendClass="h1"
-            value={runner}
-            onChange={setRunner}
-            options={[
-              { v: "helper", label: t.whoHelper },
-              { v: "self", label: t.whoSelf },
-            ]}
-          />
-          {runner && (
-            <p className="footnote">
-              <Icon name="info" size={20} />
-              <span>{helper ? t.whoHelperNote : t.whoSelfNote}</span>
-            </p>
-          )}
-          {touched && !runner && <p className="field-error" role="alert">{t.fixItems}</p>}
+          <div className="stack-sm">
+            <h1 className="h1">{t.welcomeTitle}</h1>
+            <p className="lead">{t.welcomeLead}</p>
+          </div>
+          <ul className="info-cards">
+            <li className="info-card info-card--info">
+              <Icon name="clock" />
+              <div>
+                <h2 className="info-card__title">{t.welcomeWhatTitle}</h2>
+                <p>{t.welcomeWhat}</p>
+              </div>
+            </li>
+            <li className="info-card info-card--info">
+              <Icon name="people" />
+              <div>
+                <h2 className="info-card__title">{t.welcomeWhoTitle}</h2>
+                <p>{t.welcomeWho}</p>
+              </div>
+            </li>
+            <li className="info-card info-card--ok">
+              <Icon name="shield" />
+              <div>
+                <h2 className="info-card__title">{t.welcomeSafeTitle}</h2>
+                <ul className="info-card__list">
+                  {t.welcomeSafe.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </li>
+            <li className="info-card info-card--warn">
+              <Icon name="alert" />
+              <div>
+                <h2 className="info-card__title">{t.welcomeNotDxTitle}</h2>
+                <p>{t.welcomeNotDx}</p>
+              </div>
+            </li>
+          </ul>
+          <p className="footnote">
+            <Icon name="doc" size={20} />
+            <span>
+              {t.welcomeAgree} <Link href="/privacy">{t.privacyLink}</Link> {t.and} <Link href="/terms">{t.termsLink}</Link>.
+            </span>
+          </p>
         </section>
       )}
 
@@ -289,69 +299,15 @@ export default function Start() {
       {step === "body" && (
         <section className="stack">
           <h1 className="h1">{t.bodyTitle}</h1>
-          <fieldset className="choice-group">
-            <legend className="label">{t.heightLabel}</legend>
-            <p className="hint">{t.heightHint}</p>
-            <div className="segmented" role="group" aria-label={t.heightLabel}>
-              <button type="button" aria-pressed={heightUnit === "imperial"} onClick={() => setHeightUnit("imperial")}>
-                {t.feet} + {t.inches}
-              </button>
-              <button type="button" aria-pressed={heightUnit === "metric"} onClick={() => setHeightUnit("metric")}>
-                {t.cm}
-              </button>
-            </div>
-            <div className="input-row">
-              {heightUnit === "imperial" ? (
-                <>
-                  <span className="input-unit">
-                    <input
-                      className="input input--short"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      aria-label={`${t.heightLabel}, ${t.feet}`}
-                      value={ft}
-                      onChange={(e) => setFt(e.target.value.replace(/\D/g, "").slice(0, 1))}
-                    />
-                    <span className="input-unit__suffix">{t.feet}</span>
-                  </span>
-                  <span className="input-unit">
-                    <input
-                      className="input input--short"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      aria-label={`${t.heightLabel}, ${t.inches}`}
-                      value={inch}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                        setInch(v === "" ? "" : String(Math.min(11, Number(v))));
-                      }}
-                    />
-                    <span className="input-unit__suffix">{t.inches}</span>
-                  </span>
-                </>
-              ) : (
-                <span className="input-unit">
-                  <input
-                    className="input input--short"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    aria-label={`${t.heightLabel}, ${t.cm}`}
-                    value={cmText}
-                    onChange={(e) => setCmText(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                  />
-                  <span className="input-unit__suffix">{t.cm}</span>
-                </span>
-              )}
-            </div>
-            {(heightEntered || touched) && !heightValid && (
-              <p className="field-error" role="alert">
-                {t.heightInvalid}
-              </p>
-            )}
-          </fieldset>
+          <HeightInput
+            t={t}
+            unit={heightUnit}
+            onUnit={setHeightUnit}
+            cm={heightCm}
+            onCm={setHeightCm}
+            sex={sex}
+            showError={touched && !heightValid}
+          />
           <ChoiceGroup
             legend={helper ? t.aidLabel : t.aidLabelSelf}
             value={aid}
@@ -419,8 +375,8 @@ export default function Start() {
           <h1 className="h1">{name ? t.summaryTitleNamed(name) : t.summaryTitle}</h1>
           <StatusBadge kind={atRisk ? "risk" : "ok"}>{atRisk ? t.summaryRisk : t.summaryOk}</StatusBadge>
           <p className="lead">{atRisk ? t.resultBodyRisk : t.resultBodyBaseline}</p>
-          {fallen && injured && <p className="callout">{t.resultInjured}</p>}
-          {fallen && fallCount !== null && fallCount !== "1" && <p className="callout">{t.resultTwoPlus}</p>}
+          {fallen && injured && <p className="callout callout--error">{t.resultInjured}</p>}
+          {fallen && fallCount !== null && fallCount !== "1" && <p className="callout callout--error">{t.resultTwoPlus}</p>}
           {chairStandNorm(age, sex ?? "female") === null && (
             <p className="footnote">
               <Icon name="info" size={20} />

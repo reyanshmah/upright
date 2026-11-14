@@ -71,7 +71,7 @@ export function scoreChairStand(count: number, armsUsed: boolean, age: number, s
  * in a detector). Bump CONFIG_VERSION on every change; thresholds freeze on
  * Nov 14 (v1.0), after that only bug fixes.
  */
-export const CONFIG_VERSION = "2026-11-12.4";
+export const CONFIG_VERSION = "2026-11-14.1";
 
 /** Algorithm constants shared by the live gates and the tests. */
 export const ALGO = {
@@ -92,6 +92,13 @@ export const GATES = {
   arms: { onMs: 400, offMs: 600 },
   /** Start stays disabled until every gate has been green this long. */
   allGreenHoldMs: 700,
+  /**
+   * NEW Nov 14 (user-approved): during the instructions and 3-2-1, the person
+   * must be out of view (body or one-person gate off) this long before the
+   * start pauses, so a phone held by hand can sway without stopping it.
+   * Standing up or uncrossing the arms still pauses at once.
+   */
+  interruptLostMs: 1_500,
   /** A second person in view longer than this (ms, inside the run) refuses the test. */
   secondPersonRefuseMs: 500,
   /** Whole-body gate off this long at the start or end of a TUG = person not visible there. */
@@ -104,6 +111,26 @@ export const GATES = {
 export const BALANCE = {
   /** Both knees straighter than this (deg) = standing, ready to start. */
   standKneeDeg: 150,
+} as const;
+
+/**
+ * NEW Nov 14 (user-approved): the PHONE moving, from its gyroscope
+ * (lib/motion.ts). Hand tremor and wobble are ignored; a turn of more than
+ * phoneMovedDeg pauses the start, or stops a running test (the picture no
+ * longer matches). leakS lets slow sensor drift fade instead of adding up.
+ */
+export const MOTION = {
+  phoneMovedDeg: 15,
+  leakS: 10,
+} as const;
+
+/**
+ * NEW Nov 14 (user-approved): if the camera runs below ALGO.minFps for this
+ * long while no test is recording (e.g. iPhone Low Power Mode), switch to the
+ * lighter pose model so it keeps up (lib/pose/usePoseCamera.ts).
+ */
+export const PERF = {
+  liteAfterMs: 3_000,
 } as const;
 
 /** Per-frame features (lib/analysis/features.ts). */

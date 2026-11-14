@@ -10,6 +10,8 @@ import { loadSession, updateSession, type SessionState } from "@/lib/session";
 import { setLangPref } from "@/lib/langPref";
 import { SetupDiagram } from "@/components/Diagram";
 import { ARMeasure } from "@/components/ARMeasure";
+import { MeasureAppCard } from "@/components/MeasureAppCard";
+import { isIOS } from "@/lib/platform";
 import { PoseMeasure } from "@/components/PoseMeasure";
 
 type Step = "safety" | "method" | "tape" | "ar" | "pose";
@@ -20,7 +22,7 @@ export default function Setup() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [step, setStep] = useState<Step>("safety");
-  const [checks, setChecks] = useState([false, false, false, false, false]);
+  const [checks, setChecks] = useState([false, false, false, false]);
 
   useEffect(() => {
     setSession(loadSession());
@@ -32,7 +34,7 @@ export default function Setup() {
 
   const lang = session.lang;
   const t = STRINGS[lang];
-  const items = [t.safetyChair, t.safetyFloor, t.safetyShoes, t.safetyHelper, t.safetyStop];
+  const items = [t.safetyChair, t.safetyFloor, t.safetyHelper, t.safetyStop];
   const allChecked = checks.every(Boolean);
   const onLang = (l: Lang) => {
     setLangPref(l);
@@ -40,7 +42,8 @@ export default function Setup() {
     setSession({ ...session, lang: l });
   };
 
-  const finish = (method: "ar" | "tape" | "pose", measured: number | null) => {
+  const ios = isIOS();
+  const finish = (method: "ar" | "tape" | "pose" | "app", measured: number | null) => {
     updateSession({ setup: { safetyConfirmed: true, lineMethod: method, cameraMeasuredM: measured } });
     router.push("/test/tug");
   };
@@ -96,7 +99,7 @@ export default function Setup() {
           </ul>
           <p className="footnote" aria-live="polite">
             <Icon name={allChecked ? "check" : "info"} size={20} />
-            <span>{allChecked ? t.allChecked : `${t.safetyAll} (${checks.filter(Boolean).length}/5)`}</span>
+            <span>{allChecked ? t.allChecked : t.safetyAll(checks.filter(Boolean).length, items.length)}</span>
           </p>
         </>
       )}
@@ -108,13 +111,15 @@ export default function Setup() {
             <p className="lead">{t.measureSub}</p>
           </div>
           <SetupDiagram kind="measure" lang={lang} />
+          {ios && <MeasureAppCard t={t} onDone={() => finish("app", null)} />}
           <div className="action-list">
             <button type="button" className="action-card" onClick={() => setStep("tape")}>
               <span>{t.measureTape}</span>
               <Icon name="back" className="icon--flip" />
             </button>
-            <button type="button" className="action-card" onClick={() => setStep("ar")}>
-              <span>{t.measureCamera}</span>
+            {/* iPhone has no web AR: go straight to the camera estimate. */}
+            <button type="button" className="action-card" onClick={() => setStep(ios ? "pose" : "ar")}>
+              <span>{ios ? t.measureEstimate : t.measureCamera}</span>
               <Icon name="back" className="icon--flip" />
             </button>
           </div>
@@ -128,6 +133,7 @@ export default function Setup() {
             <p className="lead">{t.tapeBody}</p>
           </div>
           <SetupDiagram kind="tug" lang={lang} />
+          {ios && <MeasureAppCard t={t} compact onDone={() => finish("app", null)} />}
         </>
       )}
 
@@ -146,10 +152,11 @@ export default function Setup() {
       {step === "pose" && (
         <>
           <h1 className="h1">{t.measureTitle}</h1>
+          {ios && <MeasureAppCard t={t} compact onDone={() => finish("app", null)} />}
           <PoseMeasure
             lang={lang}
             heightCm={session.profile.heightCm}
-            onBack={() => setStep("ar")}
+            onBack={() => setStep(ios ? "method" : "ar")}
             onDone={(m) => finish("pose", m)}
           />
         </>

@@ -27,7 +27,7 @@ function checksFor(id: (typeof THEME_IDS)[number]): Check[] {
     { label: "focus ring on page", fg: t.ring, bg: t.bg, min: NON_TEXT },
     { label: "focus ring on card", fg: t.ring, bg: t.card, min: NON_TEXT },
   ];
-  for (const k of ["ok", "risk", "total", "none"] as const) {
+  for (const k of ["ok", "risk", "total", "none", "info"] as const) {
     const s = t[k];
     list.push({ label: `${k} text`, fg: s.fg, bg: s.bg, min: TEXT });
     list.push({ label: `${k} icon and border on its fill`, fg: s.bd, bg: s.bg, min: NON_TEXT });
@@ -74,7 +74,7 @@ describe("tokens.css stays in sync with themes.ts", () => {
       "--stop": t.stop, "--stop-fg": t.stopFg, "--stop-bd": t.stopBd,
       "--slate": t.slate, "--slate-fg": t.slateFg, "--slate-bd": t.slateBd,
     };
-    for (const k of ["ok", "risk", "total", "none"] as const) {
+    for (const k of ["ok", "risk", "total", "none", "info"] as const) {
       expected[`--${k}-bg`] = t[k].bg;
       expected[`--${k}-fg`] = t[k].fg;
       expected[`--${k}-bd`] = t[k].bd;

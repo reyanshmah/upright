@@ -7,6 +7,8 @@ import { NeedStart } from "@/components/NeedStart";
 import { loadSession, updateSession, type SessionState, type TugEntry } from "@/lib/session";
 import { setLangPref } from "@/lib/langPref";
 import { TestRunner } from "@/components/TestRunner";
+import { STRINGS } from "@/lib/i18n";
+import { isIOS } from "@/lib/platform";
 
 export default function TugPage() {
   const router = useRouter();
@@ -37,6 +39,7 @@ export default function TugPage() {
       }}
       onNext={() => router.push("/test/chair")}
       onBack={() => router.push("/setup")}
+      introNote={session.setup?.lineMethod === "pose" && isIOS() ? STRINGS[session.lang].lineCheckReminder : undefined}
     />
   );
 }

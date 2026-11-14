@@ -10,6 +10,8 @@ import {
   cmToFtIn,
   distanceM,
   footX,
+  HEIGHT_MAX_CM,
+  HEIGHT_MIN_CM,
   measurable,
   median,
   pixelsPerMeter,
@@ -56,9 +58,6 @@ const TXT = {
   },
 };
 
-/** Height range the profile accepts (same as the start screen). */
-const HEIGHT_MIN_CM = 120;
-const HEIGHT_MAX_CM = 215;
 const READOUT_MS = 150;
 const SMOOTH_FRAMES = 5;
 

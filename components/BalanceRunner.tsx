@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { AUTO_NEXT_S, cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
 import { playCue, playCueAndWait, stopCues, unlockAudio, type CueId } from "@/lib/voice";
 import { getAutoStart } from "@/lib/displayPrefs";
+import { phoneMoved, resetPhoneMotion, startPhoneMotion } from "@/lib/motion";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
 import { angleDeg } from "@/lib/signal/geometry";
 import { StableFlag } from "@/lib/signal/gate";
@@ -59,6 +60,7 @@ export function BalanceRunner({
   /** Settings > Start the test: automatically once standing has held green. */
   const [autoStart, setAutoStartOn] = useState(false);
   const autoStartRef = useRef(false);
+  const [abortNote, setAbortNote] = useState("");
 
   const onFrame = (f: FrameInfo) => {
     const p = phaseRef.current;
@@ -86,6 +88,12 @@ export function BalanceRunner({
       }
     }
 
+    if (p === "running" && phoneMoved()) {
+      // The phone was picked up or turned: the stance can't be judged any more.
+      abort(t.phoneMovedRun);
+      return;
+    }
+
     if (p === "running") {
       frameOk.current.total++;
       if (f.bodyOk && f.fpsOk) frameOk.current.ok++;
@@ -99,6 +107,7 @@ export function BalanceRunner({
     unlockAudio(lang);
     autoStartRef.current = getAutoStart() === "on";
     setAutoStartOn(autoStartRef.current);
+    startPhoneMotion();
     fx.current = null;
     gateSince.current = null;
     setGateHeldMs(0);
@@ -152,6 +161,7 @@ export function BalanceRunner({
   const run = async () => {
     if (phaseRef.current !== "position") return; // already started (auto-start fires on every frame)
     phaseRef.current = "running";
+    resetPhoneMotion(); // the phone's position now is where it must stay
     unlockAudio(lang);
     aborted.current = false;
     det.current = new BalanceDetector();
@@ -231,11 +241,13 @@ export function BalanceRunner({
     setPhase("done");
   };
 
-  const abort = () => {
+  const abort = (note?: string) => {
     aborted.current = true;
     cam.stopRecording();
     cam.stop();
     stopCues();
+    setAbortNote(note ?? "");
+    if (note) void playCue(lang, "paused", note);
     setPhase("aborted");
   };
 
@@ -294,7 +306,7 @@ export function BalanceRunner({
     );
   } else if (phase === "running") {
     pinned = (
-      <button type="button" className="btn btn--stop" onClick={abort}>
+      <button type="button" className="btn btn--stop" onClick={() => abort()}>
         {t.abort}
       </button>
     );
@@ -360,7 +372,7 @@ export function BalanceRunner({
           </ul>
           <h2 className="h2">{t.placementTitle}</h2>
           <p>{t.balPlace}</p>
-          <p className="note">{t.spotterTip}</p>
+          <p className="callout">{t.spotterTip}</p>
           <button type="button" className="linkish" onClick={() => onSkip("user skipped")}>
             {t.skipTest}
           </button>
@@ -370,11 +382,12 @@ export function BalanceRunner({
       {phase === "position" && (
         <>
           {autoStart ? <p className="note">{t.autoStartNote}</p> : null}
+          {cam.lite ? <p className="note">{t.liteNote}</p> : null}
           {cam.camera && <CameraControls cam={cam} lang={lang} onChange={() => { fx.current = null; }} />}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {rows.map((r) => (
               <li key={r.id}>
-                <StatusBadge kind={r.ok ? "ok" : "risk"}>{r.text}</StatusBadge>
+                <StatusBadge kind={r.ok ? "ok" : "total"}>{r.text}</StatusBadge>
               </li>
             ))}
           </ul>
@@ -383,7 +396,7 @@ export function BalanceRunner({
 
       {phase === "aborted" && (
         <>
-          <StatusBadge kind="none">{t.aborted}</StatusBadge>
+          <StatusBadge kind="none">{abortNote || t.aborted}</StatusBadge>
           <button type="button" className="linkish" onClick={() => onSkip("stopped for safety")}>
             {t.skipTest}
           </button>

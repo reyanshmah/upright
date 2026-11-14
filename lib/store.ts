@@ -67,3 +67,20 @@ export async function listRuns(): Promise<StoredRun[]> {
     return [];
   }
 }
+
+/** Settings > Delete my data: removes every saved result from this phone. */
+export async function clearRuns(): Promise<boolean> {
+  try {
+    const db = await open();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    return true;
+  } catch {
+    return false;
+  }
+}

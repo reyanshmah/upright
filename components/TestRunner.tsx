@@ -8,6 +8,7 @@ import { CameraStage } from "@/components/CameraStage";
 import { CameraControls } from "@/components/CameraControls";
 import { getLastCueSource, playCue, playCueAndWait, stopCues, unlockAudio } from "@/lib/voice";
 import { getAutoStart } from "@/lib/displayPrefs";
+import { phoneMoved, resetPhoneMotion, startPhoneMotion } from "@/lib/motion";
 import { buildChairResult, buildTugResult, tugMarkVisible, type RunContext } from "@/lib/analysis";
 import { FeatureExtractor, facingCamera } from "@/lib/analysis/features";
 import { TugDetector, type TugPhase } from "@/lib/analysis/tug";
@@ -47,6 +48,7 @@ export function TestRunner({
   onSkip,
   onNext,
   onBack,
+  introNote,
 }: {
   kind: Kind;
   lang: Lang;
@@ -58,6 +60,8 @@ export function TestRunner({
   onNext: () => void;
   /** Back from the intro screen. */
   onBack?: () => void;
+  /** A reminder shown on the intro screen (e.g. check the 3 m line with the Measure app). */
+  introNote?: string;
 }) {
   const t = STRINGS[lang];
   const [phase, setPhase] = useState<Phase>("intro");
@@ -83,6 +87,8 @@ export function TestRunner({
   const autoStartRef = useRef(false);
   /** Bumped by every start and every interruption, so a stale start can't carry on. */
   const runId = useRef(0);
+  /** When the person dropped out of view during the instructions / 3-2-1 (ms), or null. */
+  const lostSince = useRef<number | null>(null);
 
   const phaseRef = useRef<Phase>("intro");
   phaseRef.current = phase;
@@ -140,13 +146,25 @@ export function TestRunner({
       setSeated(s);
       setArmsCrossed(a);
       const ok = f.gatesOk && s && a;
-      // Moved out of position (stood up, stepped out of view, a check went
-      // yellow) during the instructions or 3-2-1: pause the start instead of
-      // timing a run that began out of position. Flags are smoothed, so a
-      // brief flicker does not do this.
-      if (p !== "position" && !ok) {
-        interrupt();
-        return;
+      // During the instructions and 3-2-1, pause the start only when it matters:
+      // - the PERSON moved: stood up or uncrossed their arms (posture is measured
+      //   on the body itself, so a shaky phone can't fake it): pause at once;
+      // - the person is out of view for GATES.interruptLostMs: a hand-held phone
+      //   can sway the feet out of the picture for a moment without stopping it;
+      // - the PHONE turned more than MOTION.phoneMovedDeg (gyroscope).
+      // A frame-rate dip never pauses (the run's median fps is judged at the end).
+      if (p !== "position") {
+        if (f.bodyOk && f.personOk) lostSince.current = null;
+        else lostSince.current ??= f.t;
+        const lostLong = lostSince.current !== null && f.t - lostSince.current >= GATES.interruptLostMs;
+        if (!s || !a || lostLong) {
+          interrupt("person");
+          return;
+        }
+        if (phoneMoved()) {
+          interrupt("phone");
+          return;
+        }
       }
       if (ok) {
         gateSince.current ??= f.t;
@@ -157,6 +175,12 @@ export function TestRunner({
         gateSince.current = null;
         setGateHeldMs(0);
       }
+    }
+
+    if (p === "running" && phoneMoved()) {
+      // The phone was picked up or turned: the picture no longer matches the run.
+      abortRun("phone_moved");
+      return;
     }
 
     if (p === "running") {
@@ -235,6 +259,7 @@ export function TestRunner({
 
   const openCamera = () => {
     unlockAudio(lang);
+    startPhoneMotion();
     autoStartRef.current = getAutoStart() === "on";
     setAutoStartOn(autoStartRef.current);
     setNotice("");
@@ -253,17 +278,18 @@ export function TestRunner({
     void cam.start("environment");
   };
 
-  /** The person left their position during the instructions or countdown: back to the check. */
-  const interrupt = () => {
+  /** The person (or the phone) moved during the instructions or countdown: back to the check. */
+  const interrupt = (why: "person" | "phone") => {
     runId.current++;
     stopCues();
     cam.stopRecording(); // the pre-roll is recorded again on the next start
     phaseRef.current = "position";
     gateSince.current = null;
     setGateHeldMs(0);
-    setNotice(autoStartRef.current ? t.pausedAuto : t.pausedManual);
+    lostSince.current = null;
+    setNotice(why === "phone" ? t.pausedPhone : autoStartRef.current ? t.pausedAuto : t.pausedManual);
     // Said out loud too: someone testing alone has walked away from the screen.
-    void playCue(lang, "paused", autoStartRef.current ? t.pausedSpokenAuto : t.pausedSpokenManual);
+    void playCue(lang, "paused", why === "phone" ? t.pausedPhoneSpoken : autoStartRef.current ? t.pausedSpokenAuto : t.pausedSpokenManual);
     setPhase("position");
   };
 
@@ -272,6 +298,8 @@ export function TestRunner({
     const id = ++runId.current;
     const live = (want: Phase) => runId.current === id && phaseRef.current === want;
     phaseRef.current = "instructions";
+    lostSince.current = null;
+    resetPhoneMotion(); // the phone's position now is where it must stay
     unlockAudio(lang);
     gateLog.current.reset();
     sessionFile.current = null;
@@ -361,7 +389,8 @@ export function TestRunner({
   };
 
   /** Stop the test, show no number, and log the refusal. */
-  const abortRun = (reason: "aborted" | "tab_hidden") => {
+  /** Stop and refuse: Stop tapped, the tab was hidden, or the phone was moved mid-test. */
+  const abortRun = (reason: "aborted" | "tab_hidden" | "phone_moved") => {
     if (finishing.current) return;
     finishing.current = true;
     runId.current++;
@@ -380,7 +409,8 @@ export function TestRunner({
     const ctx: RunContext = {
       medianFps: fpsMedian,
       gateLog: gateLog.current.relativeTo(goT.current ?? 0),
-      aborted: reason === "aborted",
+      // A moved phone is refused like a stop: no number from a picture that shifted.
+      aborted: reason === "aborted" || reason === "phone_moved",
       tabHidden: reason === "tab_hidden",
     };
     const result = kind === "tug" ? buildTugResult(st, ctx) : buildChairResult(st, ctx, { age, sex });
@@ -398,7 +428,8 @@ export function TestRunner({
         markVisible: kind === "tug" ? tugMarkVisible(st) : null,
       });
     }
-    setAbortNote(reason === "tab_hidden" ? t.refusalReasons.tab_hidden : t.aborted);
+    setAbortNote(reason === "tab_hidden" ? t.refusalReasons.tab_hidden : reason === "phone_moved" ? t.phoneMovedRun : t.aborted);
+    if (reason === "phone_moved") void playCue(lang, "paused", t.phoneMovedRun);
     setPhase("aborted");
   };
   const abort = () => abortRun("aborted");
@@ -451,8 +482,10 @@ export function TestRunner({
       }
       rows={rows}
       notice={notice}
+      introNote={introNote}
       autoStart={autoStart}
       autoLeft={autoLeft}
+      lite={cam.lite}
       tips={kind === "tug" ? [...(frontal ? [t.tipSideView] : []), ...(portrait ? [t.tipTurnSideways] : [])] : []}
       allOk={rows.every((r) => r.ok)}
       gateReady={gateReady}

@@ -1,15 +1,25 @@
 /**
- * Reading preferences kept on this device: text size and font.
- * Applied as attributes on <html> (data-text, data-font) so CSS can switch
- * them; app/layout.tsx sets them before first paint from the same keys.
+ * Reading preferences kept on this device: text scale, font, line spacing and
+ * the reading guide. Applied on <html> (--text-scale, data-font,
+ * data-spacing, data-guide) so CSS can switch them; app/layout.tsx applies
+ * them before first paint from the same keys.
  */
-export type TextSize = "standard" | "large";
 export type FontPref = "standard" | "dyslexic";
+export type Spacing = "normal" | "wide";
+export type Guide = "off" | "on";
 
+/** Old two-step size ("standard" | "large"); read once to carry "large" over to 1.2x. */
 export const TEXT_KEY = "upright-text";
+export const TEXT_SCALE_KEY = "upright-text-scale";
+export const TEXT_SCALE_MIN = 0.75;
+export const TEXT_SCALE_MAX = 1.25;
+export const TEXT_SCALE_STEP = 0.05;
 export const FONT_KEY = "upright-font";
-export const TEXT_SIZES: readonly TextSize[] = ["standard", "large"];
+export const SPACING_KEY = "upright-spacing";
+export const GUIDE_KEY = "upright-guide";
 export const FONT_PREFS: readonly FontPref[] = ["standard", "dyslexic"];
+export const SPACINGS: readonly Spacing[] = ["normal", "wide"];
+export const GUIDES: readonly Guide[] = ["off", "on"];
 
 function read<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   try {
@@ -28,12 +38,37 @@ function write(key: string, value: string): void {
   }
 }
 
-export const getTextSize = () => read(TEXT_KEY, TEXT_SIZES, "standard");
 export const getFontPref = () => read(FONT_KEY, FONT_PREFS, "standard");
+export const getSpacing = () => read(SPACING_KEY, SPACINGS, "normal");
+export const getGuide = () => read(GUIDE_KEY, GUIDES, "off");
 
-export function setTextSize(v: TextSize): void {
-  write(TEXT_KEY, v);
-  document.documentElement.dataset.text = v;
+/** Text scale on top of the phone's own text size: 0.75x to 1.25x. */
+export function getTextScale(): number {
+  try {
+    const v = Number(localStorage.getItem(TEXT_SCALE_KEY));
+    if (v >= TEXT_SCALE_MIN && v <= TEXT_SCALE_MAX) return v;
+    return localStorage.getItem(TEXT_KEY) === "large" ? 1.2 : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function setTextScale(v: number): void {
+  const s = Math.round(Math.min(TEXT_SCALE_MAX, Math.max(TEXT_SCALE_MIN, v)) * 100) / 100;
+  write(TEXT_SCALE_KEY, String(s));
+  document.documentElement.style.setProperty("--text-scale", String(s));
+}
+
+export function setSpacing(v: Spacing): void {
+  write(SPACING_KEY, v);
+  document.documentElement.dataset.spacing = v;
+}
+
+/** The reading guide component listens for this event to show or hide itself. */
+export function setGuide(v: Guide): void {
+  write(GUIDE_KEY, v);
+  document.documentElement.dataset.guide = v;
+  window.dispatchEvent(new Event("upright-guide"));
 }
 
 export function setFontPref(v: FontPref): void {

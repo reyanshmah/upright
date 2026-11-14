@@ -6,7 +6,7 @@ import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { createPoseLandmarker, SKELETON_EDGES, type ModelVariant } from "./landmarker";
 import { missingParts, type BodyPart } from "../signal/geometry";
 import { StableFlag } from "../signal/gate";
-import { ALGO, GATES } from "../signal/thresholds";
+import { ALGO, GATES, PERF } from "../signal/thresholds";
 import type { Landmark, PoseFrame } from "../signal/types";
 import { toRecorded } from "../signal/privacy";
 import { accumulateUp, turnOf, uprightLandmarks, uprightSize, type Turn, type UpAccumulator } from "./orientation";
@@ -124,6 +124,11 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
   const turnRef = useRef<Turn>(0);
   /** Optional skeleton color for the main person (e.g. by test phase); null = gate colors. */
   const tintRef = useRef<string | null>(null);
+  // Slow camera (e.g. Low Power Mode): switch to the lighter model, outside a recording.
+  const liteRef = useRef(false);
+  const slowSince = useRef<number | null>(null);
+  const swapping = useRef(false);
+  const [lite, setLite] = useState(false);
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
@@ -203,6 +208,30 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
       ft.push(t);
       while (ft.length && t - ft[0] > 1000) ft.shift();
       const fps = ft.length > 1 ? ((ft.length - 1) * 1000) / (t - ft[0]) : 0;
+
+      // Too slow for PERF.liteAfterMs and not recording: swap in the lite model.
+      // The old model keeps running until the new one is ready, so no frame is lost.
+      if (!liteRef.current && !swapping.current && recording.current === null && ft.length > 5) {
+        if (fps < ALGO.minFps) {
+          slowSince.current ??= t;
+          if (t - slowSince.current >= PERF.liteAfterMs) {
+            swapping.current = true;
+            createPoseLandmarker("lite")
+              .then((next) => {
+                const old = landmarkerRef.current;
+                landmarkerRef.current = next;
+                old?.close();
+                liteRef.current = true;
+                setLite(true);
+              })
+              .catch(() => undefined)
+              .finally(() => {
+                swapping.current = false;
+                slowSince.current = null;
+              });
+          }
+        } else slowSince.current = null;
+      }
 
       const raw = people[0] ?? null;
       // Rotation lock / upside-down phone: analyse an upright copy of the landmarks.
@@ -370,6 +399,8 @@ export function usePoseCamera(onFrame?: (f: FrameInfo) => void) {
     error,
     gates,
     camera,
+    /** Running the lighter pose model because the camera was too slow. */
+    lite,
     facing,
     flipCamera,
     start,

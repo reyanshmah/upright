@@ -47,7 +47,7 @@ export default function ChairPage() {
       >
         <p className="eyebrow">{t.testOf(2)}</p>
         <h1 className="h1">{t.chairName}</h1>
-        <StatusBadge kind="risk">{t.slowSkipNote}</StatusBadge>
+        <StatusBadge kind="total">{t.slowSkipNote}</StatusBadge>
         <button type="button" className="btn btn--secondary" onClick={() => setOverride(true)}>
           {t.doAnyway}
         </button>

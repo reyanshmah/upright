@@ -203,6 +203,18 @@ export function unlockAudio(lang?: Lang): void {
   }
 }
 
+/**
+ * Read any on-screen text aloud with the browser voice, at the Voice speed
+ * from Settings (questions, "Read this screen", etc.).
+ */
+export function speakText(lang: Lang, text: string): void {
+  try {
+    speak(lang, text, getVoiceRate());
+  } catch {
+    /* no speech on this browser */
+  }
+}
+
 function speak(lang: Lang, text: string, rate: number, onEnd?: () => void): void {
   const synth = window.speechSynthesis;
   synth.cancel();

@@ -47,7 +47,7 @@ export default function BalancePage() {
       >
         <p className="eyebrow">{t.testOf(3)}</p>
         <h1 className="h1">{t.balName}</h1>
-        <StatusBadge kind="risk">{t.balSkipSlow}</StatusBadge>
+        <StatusBadge kind="total">{t.balSkipSlow}</StatusBadge>
         <button type="button" className="btn btn--secondary" onClick={() => setOverride(true)}>
           {t.doAnyway}
         </button>

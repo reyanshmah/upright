@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
-export type StatusKind = "ok" | "risk" | "total" | "none";
+/** ok = good, risk = error / higher risk, total = warning / partial, info = neutral information, none = no result. */
+export type StatusKind = "ok" | "risk" | "total" | "none" | "info";
 
 /**
  * Every status shows an icon, a word and a color (never color alone).
- * ok: check · risk: exclamation in a triangle · total: half-filled circle · none: crossed circle.
+ * ok: check · risk: exclamation in a triangle · total: half-filled circle · none: crossed circle · info: "i" in a circle.
  */
 export function StatusBadge({ kind, children }: { kind: StatusKind; children: ReactNode }) {
   return (
@@ -57,6 +58,14 @@ function StatusIcon({ kind }: { kind: StatusKind }) {
         <svg {...common}>
           <circle cx="12" cy="12" r="10" />
           <path d="M8.5 8.5l7 7M15.5 8.5l-7 7" />
+        </svg>
+      );
+    case "info":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 11v6" />
+          <circle cx="12" cy="7.5" r="0.6" fill="currentColor" />
         </svg>
       );
   }

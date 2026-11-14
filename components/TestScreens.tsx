@@ -80,6 +80,10 @@ export interface TestScreenProps {
   rows: GateRow[];
   /** Placement advice that does not block the start (e.g. phone upright for the TUG). */
   tips?: string[];
+  /** The camera switched to the lighter pose model (slow phone, Low Power Mode). */
+  lite?: boolean;
+  /** Reminder on the intro screen (e.g. check the 3 m line with the Measure app). */
+  introNote?: string;
   /** Why the start was paused (moved out of position), shown on the position screen. */
   notice?: string;
   /** Auto-start is on (Settings): the test starts by itself once everything holds green. */
@@ -218,6 +222,7 @@ export function TestScreen(p: TestScreenProps) {
 
       {phase === "intro" && (
         <>
+          {p.introNote ? <p className="callout">{p.introNote}</p> : null}
           <p className="muted">{kind === "tug" ? t.tugWhat : t.chairWhat}</p>
           <ol className="steps">
             {instr.map((s, i) => (
@@ -227,7 +232,7 @@ export function TestScreen(p: TestScreenProps) {
           <h2 className="h2">{t.placementTitle}</h2>
           <p>{kind === "tug" ? t.tugPlace : t.chairPlace}</p>
           <SetupDiagram kind={kind} lang={p.lang} />
-          <p className="note">{t.spotterTip}</p>
+          <p className="callout">{t.spotterTip}</p>
           <button type="button" className="linkish" onClick={() => p.on.skip("user skipped")}>
             {t.skipTest}
           </button>
@@ -237,11 +242,12 @@ export function TestScreen(p: TestScreenProps) {
       {phase === "position" && (
         <>
           {p.autoStart ? <p className="note">{t.autoStartNote}</p> : null}
+          {p.lite ? <p className="note">{t.liteNote}</p> : null}
           {p.camLine}
           <ul className="gate-list" id="gate-list" aria-live="polite">
             {p.rows.map((r) => (
               <li key={r.id}>
-                <StatusBadge kind={r.ok ? "ok" : "risk"}>{r.text}</StatusBadge>
+                <StatusBadge kind={r.ok ? "ok" : "total"}>{r.text}</StatusBadge>
               </li>
             ))}
           </ul>

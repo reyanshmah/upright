@@ -35,9 +35,15 @@ export interface Theme {
   risk: StatusColors;
   total: StatusColors;
   none: StatusColors;
+  /** Neutral information (tips, notes). */
+  info: StatusColors;
 }
 
 /*
+ * Status colors (ok / warn = total / error = risk / info / none) are ONE
+ * colour-blind-safe set (Okabe-Ito hues: bluish green, orange, vermillion,
+ * blue) in every theme: a light-tint version for light themes and a dark-tint
+ * version for dark themes (Nov 14, user-approved).
  * Agreed palettes: clinic-light, signal-light, signal-dark.
  * PROPOSED (not yet agreed; values must not be changed without sign-off):
  *    clinic-dark, low-glare.
@@ -64,10 +70,11 @@ export const THEMES: Record<ThemeId, Theme> = {
     slate: "#34424F",
     slateFg: "#FFFFFF",
     slateBd: "none",
-    ok: { bg: "#E3F3EC", fg: "#0B6B4F", bd: "#0B6B4F" },
-    risk: { bg: "#FDE9E7", fg: "#A12622", bd: "#A12622" },
-    total: { bg: "#FFF1D6", fg: "#7A4300", bd: "#7A4300" },
-    none: { bg: "#E4E9EE", fg: "#34424F", bd: "#34424F" },
+    ok: { bg: "#E2F4EE", fg: "#00573F", bd: "#007A5E" },
+    risk: { bg: "#FCE7DD", fg: "#983600", bd: "#C24E00" },
+    total: { bg: "#FFF0D4", fg: "#6E4300", bd: "#A86A00" },
+    none: { bg: "#E8ECF0", fg: "#34424F", bd: "#5B6875" },
+    info: { bg: "#E3F0F9", fg: "#00507F", bd: "#0072B2" },
   },
   // PROPOSED palette, not yet agreed.
   "clinic-dark": {
@@ -90,10 +97,11 @@ export const THEMES: Record<ThemeId, Theme> = {
     slate: "#2B3A4B",
     slateFg: "#FFFFFF",
     slateBd: "2px solid #C3CFDB",
-    ok: { bg: "#12382B", fg: "#8EE6B8", bd: "#8EE6B8" },
-    risk: { bg: "#4A1B1B", fg: "#FFB4AB", bd: "#FFB4AB" },
-    total: { bg: "#4A3410", fg: "#FFD58A", bd: "#FFD58A" },
-    none: { bg: "#263444", fg: "#D6E0EA", bd: "#D6E0EA" },
+    ok: { bg: "#0F3328", fg: "#7FE0BF", bd: "#2FBF8F" },
+    risk: { bg: "#3F1D0E", fg: "#FFB38A", bd: "#F07A3A" },
+    total: { bg: "#3B2A08", fg: "#FFD27A", bd: "#E6A11A" },
+    none: { bg: "#26303B", fg: "#D6E0EA", bd: "#8C99A6" },
+    info: { bg: "#0D2A40", fg: "#9CCFF2", bd: "#56B4E9" },
   },
   "signal-dark": {
     id: "signal-dark",
@@ -115,10 +123,11 @@ export const THEMES: Record<ThemeId, Theme> = {
     slate: "#1A1A1D",
     slateFg: "#FFFFFF",
     slateBd: "3px solid #FFFFFF",
-    ok: { bg: "#1A1A1D", fg: "#FFFFFF", bd: "#4ADE80" },
-    risk: { bg: "#1A1A1D", fg: "#FFFFFF", bd: "#FF6B5E" },
-    total: { bg: "#1A1A1D", fg: "#FFFFFF", bd: "#FFB020" },
-    none: { bg: "#1A1A1D", fg: "#FFFFFF", bd: "#C9D1D9" },
+    ok: { bg: "#0F3328", fg: "#7FE0BF", bd: "#2FBF8F" },
+    risk: { bg: "#3F1D0E", fg: "#FFB38A", bd: "#F07A3A" },
+    total: { bg: "#3B2A08", fg: "#FFD27A", bd: "#E6A11A" },
+    none: { bg: "#26303B", fg: "#D6E0EA", bd: "#8C99A6" },
+    info: { bg: "#0D2A40", fg: "#9CCFF2", bd: "#56B4E9" },
   },
   "signal-light": {
     id: "signal-light",
@@ -140,10 +149,11 @@ export const THEMES: Record<ThemeId, Theme> = {
     slate: "#FFFFFF",
     slateFg: "#000000",
     slateBd: "3px solid #000000",
-    ok: { bg: "#FFFFFF", fg: "#000000", bd: "#006B2E" },
-    risk: { bg: "#FFFFFF", fg: "#000000", bd: "#B00020" },
-    total: { bg: "#FFFFFF", fg: "#000000", bd: "#8A5A00" },
-    none: { bg: "#FFFFFF", fg: "#000000", bd: "#333333" },
+    ok: { bg: "#E2F4EE", fg: "#00573F", bd: "#007A5E" },
+    risk: { bg: "#FCE7DD", fg: "#983600", bd: "#C24E00" },
+    total: { bg: "#FFF0D4", fg: "#6E4300", bd: "#A86A00" },
+    none: { bg: "#E8ECF0", fg: "#34424F", bd: "#5B6875" },
+    info: { bg: "#E3F0F9", fg: "#00507F", bd: "#0072B2" },
   },
   // PROPOSED palette, not yet agreed.
   "low-glare": {
@@ -166,10 +176,11 @@ export const THEMES: Record<ThemeId, Theme> = {
     slate: "#332C25",
     slateFg: "#EFE6D8",
     slateBd: "2px solid #D2C6B4",
-    ok: { bg: "#1E3A2A", fg: "#B8E6C4", bd: "#B8E6C4" },
-    risk: { bg: "#4A2220", fg: "#FFC2B8", bd: "#FFC2B8" },
-    total: { bg: "#4A3A12", fg: "#F5D68A", bd: "#F5D68A" },
-    none: { bg: "#332C25", fg: "#DDD2C2", bd: "#DDD2C2" },
+    ok: { bg: "#0F3328", fg: "#7FE0BF", bd: "#2FBF8F" },
+    risk: { bg: "#3F1D0E", fg: "#FFB38A", bd: "#F07A3A" },
+    total: { bg: "#3B2A08", fg: "#FFD27A", bd: "#E6A11A" },
+    none: { bg: "#26303B", fg: "#D6E0EA", bd: "#8C99A6" },
+    info: { bg: "#0D2A40", fg: "#9CCFF2", bd: "#56B4E9" },
   },
 };
 

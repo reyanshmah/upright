@@ -51,7 +51,9 @@ export default function Home() {
 
       <p className="footnote">
         <Icon name="lock" size={20} />
-        <span>{t.homePrivacy}</span>
+        <span>
+          {t.homePrivacy} <Link href="/privacy">{t.privacyLink}</Link> · <Link href="/terms">{t.termsLinkShort}</Link>
+        </span>
       </p>
 
       {/* The pose debug page is for the team; families never see this link. */}

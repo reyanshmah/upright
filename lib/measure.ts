@@ -56,6 +56,10 @@ export function distanceM(startX: number, nowX: number, ppm: number): number {
   return Math.abs(nowX - startX) / ppm;
 }
 
+/** Heights the profile accepts (cm): ~4 ft to ~7 ft. */
+export const HEIGHT_MIN_CM = 120;
+export const HEIGHT_MAX_CM = 215;
+
 export const TARGET_M = 3;
 export const TOLERANCE_M = 0.05;
 

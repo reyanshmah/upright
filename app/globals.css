@@ -43,8 +43,11 @@ body { overflow-wrap: break-word; }
 .num { font-size: var(--fs-num-d); }
 .timer { font-size: min(var(--fs-timer), 26vw); }
 
-/* In-app text size: "Large" = 120% on top of the phone's own setting. */
-html[data-text="large"] { font-size: 120%; }
+/* In-app text scale (Settings, 0.75x to 1.25x) on top of the phone's own text size. */
+html { font-size: calc(100% * var(--text-scale, 1)); }
+/* Wide line spacing (Settings): more room between lines, words and paragraphs. */
+html[data-spacing="wide"] { --lh-body: 1.85; letter-spacing: 0.02em; word-spacing: 0.08em; }
+html[data-spacing="wide"] .app__scroll { gap: var(--sp-6); }
 
 /* In-app font: OpenDyslexic (license in public/fonts/opendyslexic/LICENSE.txt), loaded only when chosen.
    This build is used because the newer one draws ó/Ó with a misplaced accent. */
@@ -132,16 +135,32 @@ html[data-font="dyslexic"] {
 .stack { display: flex; flex-direction: column; gap: var(--sp-4); }
 .stack-sm { display: flex; flex-direction: column; gap: var(--sp-2); }
 
-/* Footnote: small helper text with an icon, not a box. */
+/*
+ * Colour coding: ONE colour-blind-safe set in every theme (lib/themes.ts):
+ *   info = blue (notes, tips)      warn = orange (.callout: do this / careful)
+ *   ok   = bluish green            error = vermillion (.callout--error, .note.bad)
+ * A coloured bar + light tint marks the kind; the words stay in the normal
+ * ink so they are as easy to read as body text. Never colour alone: badges
+ * carry icons, callouts carry a heavier weight.
+ */
+/* Footnote: small helper text with an info icon, not a box. */
 .footnote { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-label); color: var(--ink-2); line-height: 1.45; }
-.footnote .icon { flex: none; margin-top: 1px; }
-/* Callout: something to act on (tell the doctor). A bar on the side, not a full box. */
-.callout, .note { padding: var(--sp-3) var(--sp-4); border-left: 4px solid var(--act); background: var(--card); border-radius: 0 var(--radius) var(--radius) 0; font-weight: 700; }
+.footnote .icon { flex: none; margin-top: 1px; color: var(--info-bd); }
+.callout, .note {
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 6px solid var(--info-bd);
+  background: var(--info-bg);
+  color: var(--ink);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  line-height: 1.45;
+}
 .note { font-weight: 400; }
-.callout { border-left-color: var(--risk-bd); }
-.note.bad { border-left-color: var(--risk-bd); background: var(--risk-bg); color: var(--risk-fg); }
+/* Callout: something to act on, or be careful about (warn). */
+.callout { font-weight: 700; border-left-color: var(--total-bd); background: var(--total-bg); }
+.callout--ok { border-left-color: var(--ok-bd); background: var(--ok-bg); }
+.callout--error, .note.bad { border-left-color: var(--risk-bd); background: var(--risk-bg); color: var(--ink); }
 .hint { font-size: var(--fs-label); color: var(--ink-2); line-height: 1.45; }
-.field-error { font-size: var(--fs-label); font-weight: 700; color: var(--risk-fg); }
+.field-error { font-size: var(--fs-label); font-weight: 700; color: var(--risk-fg); padding-left: var(--sp-3); border-left: 4px solid var(--risk-bd); }
 
 /* ---------- Buttons and links ---------- */
 
@@ -422,8 +441,24 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 /* ---------- Results ---------- */
 
-.plan { padding-left: 1.4em; display: grid; gap: var(--sp-3); }
+/* The family plan: one numbered card per step, so it never reads as a wall of text. */
+.plan { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--sp-3); counter-reset: plan; }
+.plan li {
+  counter-increment: plan; position: relative;
+  padding: var(--sp-3) var(--sp-4) var(--sp-3) calc(var(--sp-4) + 2.4rem);
+  background: var(--card); border: var(--card-bw) solid var(--line); border-left: 6px solid var(--info-bd);
+  border-radius: var(--radius);
+}
+.plan li::before {
+  content: counter(plan); position: absolute; left: var(--sp-3); top: var(--sp-3);
+  width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border-radius: 50%;
+  background: var(--info-bg); color: var(--info-fg); border: 2px solid var(--info-bd); font-weight: 700;
+}
+.plan li > b { display: block; color: var(--info-fg); }
 .plan p { margin-top: var(--sp-1); }
+.plan-summary { font-size: var(--fs-lead); }
+/* Results: a divider above each section heading keeps the parts apart at large text sizes. */
+.family > .h2 { padding-top: var(--sp-4); border-top: 2px solid var(--line); }
 .clinician { font-size: var(--fs-label); display: grid; gap: var(--sp-3); overflow-wrap: anywhere; }
 .clinician table { width: 100%; border-collapse: collapse; }
 .clinician th, .clinician td { text-align: left; vertical-align: top; padding: var(--sp-2); border-top: var(--card-bw) solid var(--line); }
@@ -475,3 +510,86 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
   body[data-print="clinician"] .family { display: none; }
   body[data-print="clinician"] .clinician { border: none; margin: 0; padding: 0; }
 }
+
+/* ---------- Header actions (read aloud + settings) ---------- */
+
+.app__actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+.header-btn--icon { padding: var(--sp-2); min-width: var(--target-min); justify-content: center; }
+.header-btn--icon.is-on { border-color: var(--info-bd); background: var(--info-bg); }
+
+/* ---------- Welcome: what Upright does, colour-coded cards ---------- */
+
+.info-cards { list-style: none; padding: 0; display: grid; gap: var(--sp-3); }
+.info-card {
+  display: flex; gap: var(--sp-3); align-items: flex-start;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--card); border: var(--card-bw) solid var(--line); border-left-width: 6px;
+  border-radius: var(--radius);
+}
+.info-card > .icon { margin-top: 2px; }
+.info-card__title { font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-body); margin: 0 0 var(--sp-1); }
+.info-card p { margin: 0; }
+.info-card__list { margin: 0; padding-left: 1.1em; display: grid; gap: var(--sp-2); }
+.info-card--info { border-left-color: var(--info-bd); }
+.info-card--info > .icon, .info-card--info .info-card__title { color: var(--info-fg); }
+.info-card--ok { border-left-color: var(--ok-bd); background: var(--ok-bg); }
+.info-card--ok > .icon, .info-card--ok .info-card__title { color: var(--ok-fg); }
+.info-card--warn { border-left-color: var(--total-bd); background: var(--total-bg); }
+.info-card--warn > .icon, .info-card--warn .info-card__title { color: var(--total-fg); }
+
+/* ---------- Steppers: height, text size ---------- */
+
+/* − [value] +: the buttons always sit on either side; only the middle may wrap (e.g. ft over in at large text). */
+.stepper { display: flex; align-items: center; gap: var(--sp-2); }
+.stepper__value { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: center; justify-content: center; }
+.stepper__value .input--short { width: 4.25rem; }
+.stepper__btn {
+  flex: none; width: var(--btn-primary-h); height: var(--btn-primary-h);
+  display: grid; place-items: center;
+  background: var(--card); color: var(--ink);
+  border: 2px solid var(--ink-2); border-radius: 50%; cursor: pointer;
+}
+.stepper__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.height { display: grid; gap: var(--sp-3); }
+.height__other { font-weight: 700; color: var(--ok-fg); background: var(--ok-bg); border-left: 4px solid var(--ok-bd); padding: var(--sp-2) var(--sp-3); border-radius: 0 var(--radius) var(--radius) 0; justify-self: start; }
+
+.scale { display: flex; align-items: center; gap: var(--sp-3); }
+.scale__range { flex: 1 1 auto; min-width: 0; height: var(--target-min); accent-color: var(--act); }
+.scale__value { margin: var(--sp-1) 0 0; font-weight: 700; text-align: center; color: var(--ink-2); }
+
+/* ---------- Settings sheet: section headings ---------- */
+
+.sheet__section {
+  margin: var(--sp-2) 0 0; padding-top: var(--sp-4);
+  border-top: 2px solid var(--line);
+  font-family: var(--font-head); font-weight: var(--w-head); font-size: var(--fs-body);
+  color: var(--info-fg);
+}
+.sheet__links { margin: 0; font-size: var(--fs-label); }
+.sheet__links a, .footnote a { color: inherit; font-weight: 700; text-underline-offset: 3px; }
+
+/* ---------- Privacy Policy / Terms of Service ---------- */
+
+.legal { gap: var(--sp-5); }
+.legal__section { display: grid; gap: var(--sp-2); padding-left: var(--sp-4); border-left: 4px solid var(--info-bd); }
+.legal__section .h2 { font-size: var(--fs-body); }
+.legal__section p { margin: 0; }
+.legal__list { margin: 0; padding-left: 1.2em; display: grid; gap: var(--sp-2); }
+
+/* ---------- Reading guide (Settings): a band that follows the finger ---------- */
+
+.reading-guide {
+  position: fixed; left: 0; right: 0; z-index: 40; pointer-events: none;
+  height: calc(var(--fs-body) * var(--lh-body) * 1.6);
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--info-bd) 16%, transparent);
+  border-block: 2px solid color-mix(in srgb, var(--info-bd) 70%, transparent);
+}
+@media print { .reading-guide, .app__actions { display: none !important; } }
+
+/* Numbered steps inside a card: smaller circles. */
+.steps--compact { gap: var(--sp-2); }
+.steps--compact li::before { width: 26px; height: 26px; }
+.measure-app .btn { margin-top: var(--sp-2); }
+/* Settings: live preview of the text size, font and spacing. */
+.sheet__sample { margin: 0; padding: var(--sp-3) var(--sp-4); background: var(--card); border: var(--card-bw) solid var(--line); border-left: 6px solid var(--info-bd); border-radius: var(--radius); font-size: var(--fs-lead); }
