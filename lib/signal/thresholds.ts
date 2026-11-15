@@ -111,6 +111,11 @@ export const GATES = {
 export const BALANCE = {
   /** Both knees straighter than this (deg) = standing, ready to start. */
   standKneeDeg: 150,
+  /** Smallest shank (px) and hip width (px) that count as a usable frame. */
+  minShankPx: 5,
+  minHipWPx: 3,
+  /** Fewest sway samples in a hold before sway (SD) is reported. */
+  minSwaySamples: 6,
   /**
    * NEW Nov 14 (user-approved): feet are measured RELATIVE TO EACH OTHER, so a
    * hand-held phone can move, zoom or tilt a little without ending a hold.

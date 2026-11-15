@@ -86,7 +86,7 @@ export class FrontFeatures {
     };
     const shank = med(this.shanks, (Math.hypot(lk.x - la0.x, lk.y - la0.y) + Math.hypot(rk.x - ra0.x, rk.y - ra0.y)) / 2);
     const hipW = med(this.hipWs, Math.abs(lh.x - rh.x));
-    if (shank < 5 || hipW < 3) return null;
+    if (shank < BALANCE.minShankPx || hipW < BALANCE.minHipWPx) return null;
 
     const la = { x: this.f.lax.filter(la0.x, s), y: this.f.lay.filter(la0.y, s) };
     const ra = { x: this.f.rax.filter(ra0.x, s), y: this.f.ray.filter(ra0.y, s) };
@@ -283,7 +283,7 @@ export class BalanceDetector {
     const heldS = Math.max(0, Math.min(HOLD_S, (tEnd - this.holdStartT) / 1000));
     const xs = this.swayXs;
     let sway: number | null = null;
-    if (xs.length > 5) {
+    if (xs.length >= BALANCE.minSwaySamples) {
       const m = xs.reduce((a, b) => a + b, 0) / xs.length;
       sway = Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
     }
