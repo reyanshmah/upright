@@ -289,7 +289,9 @@ export function TestRunner({
     lostSince.current = null;
     setNotice(why === "phone" ? t.pausedPhone : autoStartRef.current ? t.pausedAuto : t.pausedManual);
     // Said out loud too: someone testing alone has walked away from the screen.
-    void playCue(lang, "paused", why === "phone" ? t.pausedPhoneSpoken : autoStartRef.current ? t.pausedSpokenAuto : t.pausedSpokenManual);
+    if (why === "phone") void playCue(lang, "pausedPhone", t.pausedPhoneSpoken);
+    else if (autoStartRef.current) void playCue(lang, "pausedAuto", t.pausedSpokenAuto);
+    else void playCue(lang, "pausedManual", t.pausedSpokenManual);
     setPhase("position");
   };
 
@@ -429,7 +431,7 @@ export function TestRunner({
       });
     }
     setAbortNote(reason === "tab_hidden" ? t.refusalReasons.tab_hidden : reason === "phone_moved" ? t.phoneMovedRun : t.aborted);
-    if (reason === "phone_moved") void playCue(lang, "paused", t.phoneMovedRun);
+    if (reason === "phone_moved") void playCue(lang, "phoneMovedRun", t.phoneMovedRun);
     setPhase("aborted");
   };
   const abort = () => abortRun("aborted");

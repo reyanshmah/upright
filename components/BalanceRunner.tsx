@@ -9,7 +9,7 @@ import { AppShell, PinnedRow } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AUTO_NEXT_S, cameraErrorText, gateRows, type GateRow } from "@/components/TestScreens";
 import { SetupDiagram } from "@/components/Diagram";
-import { playCue, playCueAndWait, stopCues, unlockAudio, type CueId } from "@/lib/voice";
+import { BALANCE_CUES, playCue, playCueAndWait, speakText, stopCues, unlockAudio, type CueId } from "@/lib/voice";
 import { getAutoStart } from "@/lib/displayPrefs";
 import { resetPhoneMotion, startPhoneMotion } from "@/lib/motion";
 import { BalanceDetector, FrontFeatures, HOLD_S, tandemHeld10, type Stage } from "@/lib/analysis/balance";
@@ -107,7 +107,7 @@ export function BalanceRunner({
   const cam = usePoseCamera(onFrame);
 
   const openCamera = () => {
-    unlockAudio(lang);
+    unlockAudio(lang, BALANCE_CUES);
     autoStartRef.current = getAutoStart() === "on";
     setAutoStartOn(autoStartRef.current);
     startPhoneMotion();
@@ -165,7 +165,7 @@ export function BalanceRunner({
     if (phaseRef.current !== "position") return; // already started (auto-start fires on every frame)
     phaseRef.current = "running";
     resetPhoneMotion(); // the phone's position now is where it must stay
-    unlockAudio(lang);
+    unlockAudio(lang, BALANCE_CUES);
     aborted.current = false;
     det.current = new BalanceDetector();
     frameOk.current = { ok: 0, total: 0 };
@@ -280,7 +280,7 @@ export function BalanceRunner({
     cam.stop();
     stopCues();
     setAbortNote(note ?? "");
-    if (note) void playCue(lang, "paused", note);
+    if (note) speakText(lang, note);
     setPhase("aborted");
   };
 

@@ -8,8 +8,9 @@ import { timeStretch } from "./timeStretch";
 /**
  * Voice cues. Recorded EN/ES clips live in public/audio/<lang>/<id>.mp3:
  * 3-2-1, Go and Stop (the "go" cue is time zero), plus the spoken instructions
- * (tugInstr, chairInstr) and the short words (hold, good, done). balIntro was
- * re-worded on Nov 14 and plays through speech until it is re-recorded.
+ * (tugInstr, chairInstr) and the short words (hold, good, done). The balance
+ * test cues (balIntro, bal1-4, balRepeat, balFive, balFail, balLost, balEnd),
+ * the three pause messages and the phone-moved message are recorded too.
  * All recorded clips play through Web Audio (unlocked in the Start tap, so
  * they play on iPhone and get the loudness boost). If a clip is missing, the
  * browser's speech reads the same text.
@@ -43,7 +44,10 @@ export type CueId =
   | "bal4"
   | "hold"
   | "good"
-  | "paused"
+  | "pausedManual"
+  | "pausedAuto"
+  | "pausedPhone"
+  | "phoneMovedRun"
   | "retry";
 
 let lastCueSource: "mp3" | "speech" | "unknown" = "unknown";
@@ -102,9 +106,24 @@ function output(c: AudioContext): AudioNode {
 /** Cues whose timing matters: always normal speed. */
 const TIMED: CueId[] = RECORDED;
 /** Clips preloaded in the Start tap (all recorded files the screens use). */
-// balIntro was re-worded on Nov 14 ("I will tell you", not "show you"): its old
-// recording was removed, so it plays through speech until a new take is added.
-const PRELOAD: CueId[] = [...RECORDED, "tugInstr", "chairInstr", "hold", "good", "done"];
+const PRELOAD: CueId[] = [
+  ...RECORDED,
+  "tugInstr",
+  "chairInstr",
+  "hold",
+  "good",
+  "done",
+  "retry",
+  "pausedManual",
+  "pausedAuto",
+  "pausedPhone",
+  "phoneMovedRun",
+];
+
+/** Extra clips the balance test preloads when it starts (the other screens never play them). */
+export const BALANCE_CUES: CueId[] = [
+  "balIntro", "bal1", "bal2", "bal3", "bal4", "balRepeat", "balFive", "balFail", "balLost", "balEnd",
+];
 
 type Clip = { buf: AudioBuffer; onsetMs: number };
 
@@ -187,7 +206,7 @@ function rateFor(id: CueId): number {
 }
 
 /** Call from a button tap: unlocks speech and Web Audio (iOS) and preloads the cues. */
-export function unlockAudio(lang?: Lang): void {
+export function unlockAudio(lang?: Lang, extra: CueId[] = []): void {
   try {
     const u = new SpeechSynthesisUtterance("");
     window.speechSynthesis?.speak(u);
@@ -204,7 +223,7 @@ export function unlockAudio(lang?: Lang): void {
       src.buffer = ctx.createBuffer(1, 1, 22050);
       src.connect(ctx.destination);
       src.start(0);
-      if (lang) for (const id of PRELOAD) void bufferAt(lang, id, rateFor(id));
+      if (lang) for (const id of [...PRELOAD, ...extra]) void bufferAt(lang, id, rateFor(id));
     }
   } catch {
     ctx = null;
