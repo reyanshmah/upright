@@ -71,7 +71,7 @@ export function scoreChairStand(count: number, armsUsed: boolean, age: number, s
  * in a detector). Bump CONFIG_VERSION on every change; thresholds freeze on
  * Nov 14 (v1.0), after that only bug fixes.
  */
-export const CONFIG_VERSION = "2026-11-14.1";
+export const CONFIG_VERSION = "2026-11-14.2";
 
 /** Algorithm constants shared by the live gates and the tests. */
 export const ALGO = {
@@ -131,6 +131,12 @@ export const BALANCE = {
   downLift: 0.07,
   /** Moving within the first settleMs of a hold = still getting into position: restart the hold. */
   settleMs: 1000,
+  /**
+   * NEW Nov 14 (bug fix): how many times a hold may restart because the person
+   * was still settling. After that, moving ends the hold as not held (CDC: stop
+   * the test). Without it, someone who never gets into position 4 restarted forever.
+   */
+  maxSettleRestarts: 3,
   /** Feet out of view this long during a hold = can't measure (not a balance failure). */
   lostMs: 2500,
   /** Ankles below this visibility are skipped for that frame. */

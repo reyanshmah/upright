@@ -151,6 +151,13 @@ export class BalanceDetector {
   private lastFeatT = 0;
   /** The previous position's foot gap, to see that they changed position. */
   private prevGap: { gapX: number; gapY: number } | null = null;
+  /**
+   * The previous position's ankle height difference (shank lengths). A phone held
+   * above the feet sees the nearer foot lower in the picture (tandem: ~0.2), which
+   * must not look like a lifted foot in position 4.
+   */
+  private prevLift = 0;
+  private settleRestarts = 0;
   private stanceFrames: FrontFeat[] = [];
   heldS = 0;
   readonly results: StageResult[] = [];
@@ -169,6 +176,7 @@ export class BalanceDetector {
     this.movedSince = null;
     this.swayXs = [];
     this.heldS = 0;
+    this.settleRestarts = 0;
     this.lastFeatT = t;
     this.events.push({ t, type: "stageStart", stage });
   }
@@ -218,11 +226,11 @@ export class BalanceDetector {
     }
 
     const r = this.ref;
-    const now = medianFeet(this.recent);
+    const now = medianFeet(this.recent, r);
     let moved: boolean;
     if (this.stage === 4) {
       // The raised foot must not come back down (height difference between the feet).
-      moved = f.a.vis >= FOOT_VIS && f.b.vis >= FOOT_VIS && now.lift < DOWN_LIFT;
+      moved = f.a.vis >= FOOT_VIS && f.b.vis >= FOOT_VIS && now.lift < DOWN_LIFT + this.prevLift;
     } else {
       // The gap between the feet must not change: a phone that moves shifts both
       // feet together, a step changes the gap.
@@ -232,8 +240,9 @@ export class BalanceDetector {
     if (moved) {
       this.movedSince ??= t;
       if (t - this.movedSince >= MOVE_MS) {
-        if (this.movedSince - this.holdStartT < SETTLE_MS) {
-          // Still settling into the position: restart the hold, don't fail.
+        if (this.movedSince - this.holdStartT < SETTLE_MS && this.settleRestarts < BALANCE.maxSettleRestarts) {
+          // Still settling into the position: restart the hold, don't fail (a few times only).
+          this.settleRestarts++;
           this.holdStartT = t;
           this.heldS = 0;
           this.ref = null;
@@ -262,20 +271,24 @@ export class BalanceDetector {
   private inPosition(f: FrontFeat, t: number): boolean {
     this.stanceFrames.push(f);
     while (this.stanceFrames.length && t - this.stanceFrames[0].t > SETTLED_MS) this.stanceFrames.shift();
-    if (this.stage === 4) return f.lift > ONE_FOOT_LIFT;
-    if (f.lift > ONE_FOOT_LIFT) return false;
+    // Position 4: one foot clearly higher than it was in the previous position.
+    if (this.stage === 4) return f.lift > ONE_FOOT_LIFT + this.prevLift;
     // No previous position to compare to (position 1, or a stage run on its own):
     // the original front-view check, which also works at 45 deg for feet side by side.
-    if (!this.prevGap) return stanceMatches(this.stage, f);
+    if (!this.prevGap) return !(f.lift > ONE_FOOT_LIFT) && stanceMatches(this.stage, f);
+    // Positions 2-3 are recognised by the feet having moved and settled, not by
+    // their height difference: seen from above (a phone held at chest height) the
+    // front foot of a tandem stance sits ~0.2 shank lower than the back foot.
     if (f.a.vis < FOOT_VIS || f.b.vis < FOOT_VIS) return false;
     // Settled = not drifting: the first and second halves of the window agree
     // (medians, so frame-to-frame jitter doesn't matter).
     const fr = this.stanceFrames;
     if (fr.length < 6 || t - fr[0].t < SETTLED_MS * 0.9) return false;
     const half = Math.floor(fr.length / 2);
-    const m1 = medianFeet(fr.slice(0, half)), m2 = medianFeet(fr.slice(half));
+    const gaps = alignedGaps(fr);
+    const m1 = medianOf(gaps.slice(0, half)), m2 = medianOf(gaps.slice(half));
     if (Math.hypot(m1.gapX - m2.gapX, m1.gapY - m2.gapY) > SETTLED_REL) return false;
-    const m = medianFeet(fr);
+    const m = medianFeet(fr, this.prevGap);
     return Math.hypot(m.gapX - this.prevGap.gapX, m.gapY - this.prevGap.gapY) > CHANGED_REL;
   }
 
@@ -288,33 +301,71 @@ export class BalanceDetector {
       sway = Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
     }
     this.heldS = heldS;
-    if (this.ref) this.prevGap = { gapX: this.ref.gapX, gapY: this.ref.gapY };
+    if (this.ref) {
+      this.prevGap = { gapX: this.ref.gapX, gapY: this.ref.gapY };
+      this.prevLift = this.ref.lift;
+    }
     this.results.push({ stage: this.stage, heldS, completed, stanceVerified: this.stanceVerified, sway });
     this.status = completed ? "held" : "failed";
     this.events.push({ t: tEnd, type: "stageEnd", stage: this.stage });
   }
 }
 
-function medianFeet(fs: FrontFeat[]) {
-  const med = (xs: number[]) => {
-    const s = [...xs].sort((a, b) => a - b);
-    return s[Math.floor(s.length / 2)];
-  };
+type Gap = { gapX: number; gapY: number };
+
+const medianNum = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+};
+
+function medianOf(gaps: { x: number; y: number }[]): Gap {
+  return { gapX: medianNum(gaps.map((g) => g.x)), gapY: medianNum(gaps.map((g) => g.y)) };
+}
+
+/**
+ * The gap between the feet (b minus a, in each frame's own shank lengths), with
+ * every frame pointing the same way. "a" is whichever foot is left-most, so when
+ * the feet are nearly in line (tandem, seen from the front) a pixel of noise can
+ * swap a and b and flip the gap's sign: that is the same stance, not a step.
+ * Frames are turned to agree with `toward` (a known gap) or, without one, with the
+ * main axis of the frames themselves.
+ */
+function alignedGaps(fs: FrontFeat[], toward?: Gap): { x: number; y: number }[] {
+  const raw = fs.map((f) => ({ x: (f.b.x - f.a.x) / f.shank, y: (f.b.y - f.a.y) / f.shank }));
+  let ax: number, ay: number;
+  if (toward) {
+    ax = toward.gapX;
+    ay = toward.gapY;
+  } else {
+    const sxx = raw.reduce((a, g) => a + g.x * g.x, 0);
+    const syy = raw.reduce((a, g) => a + g.y * g.y, 0);
+    const sxy = raw.reduce((a, g) => a + g.x * g.y, 0);
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    ax = Math.cos(th);
+    ay = Math.sin(th);
+    if (ax < 0 || (ax === 0 && ay < 0)) {
+      ax = -ax;
+      ay = -ay;
+    }
+  }
+  return raw.map((g) => (g.x * ax + g.y * ay < 0 ? { x: -g.x, y: -g.y } : g));
+}
+
+function medianFeet(fs: FrontFeat[], toward?: Gap) {
   const pt = (pick: (f: FrontFeat) => { x: number; y: number }) => ({
-    x: med(fs.map((f) => pick(f).x)),
-    y: med(fs.map((f) => pick(f).y)),
+    x: medianNum(fs.map((f) => pick(f).x)),
+    y: medianNum(fs.map((f) => pick(f).y)),
   });
-  const planted = pt((f) => f.planted);
-  const up = pt((f) => f.up);
+  const gap = medianOf(alignedGaps(fs, toward));
   return {
     a: pt((f) => f.a),
     b: pt((f) => f.b),
-    planted,
-    up,
+    planted: pt((f) => f.planted),
+    up: pt((f) => f.up),
     // Each frame's own scale, so zooming in or out doesn't change these.
-    lift: med(fs.map((f) => Math.abs(f.planted.y - f.up.y) / f.shank)),
-    gapX: med(fs.map((f) => (f.b.x - f.a.x) / f.shank)),
-    gapY: med(fs.map((f) => (f.b.y - f.a.y) / f.shank)),
+    lift: medianNum(fs.map((f) => Math.abs(f.planted.y - f.up.y) / f.shank)),
+    gapX: gap.gapX,
+    gapY: gap.gapY,
   };
 }
 

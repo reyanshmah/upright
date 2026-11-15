@@ -260,3 +260,87 @@ describe("balance: full 4-position run filmed from 45 degrees (Nov 14 placement)
     expect(tandemHeld10(det.results)).toBe(true);
   });
 });
+
+describe("balance: phone held above the feet, as the helper holds it (Nov 14)", () => {
+  // Seen from above, the foot nearer the camera sits lower in the picture: a front-view
+  // tandem has one ankle ~0.2 shank below the other, which is not a lifted foot.
+  // Positions are ankle pixels (shank = 100 px): left x/y, right x/y.
+  type Pos = [number, number, number, number];
+  const POS: Record<Stage, Pos> = {
+    1: [540, 750, 460, 750],
+    2: [515, 755, 485, 745],
+    3: [503, 760, 497, 740], // tandem: ankles 0.2 shank apart in height, 0.06 apart sideways
+    4: [510, 750, 490, 705], // one foot up 0.45 shank
+  };
+  const lms = (p: Pos): Landmark[] => {
+    const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.3, z: 0, visibility: 0.95 }));
+    const set = (i: number, x: number, y: number) => (lm[i] = { x: x / 1000, y: y / 1000, z: 0, visibility: 0.95 });
+    set(23, 550, 500);
+    set(24, 450, 500);
+    set(25, 520, 650);
+    set(26, 480, 650);
+    set(27, p[0], p[1]);
+    set(28, p[2], p[3]);
+    return lm;
+  };
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  // px of jitter on every ankle coordinate, plus a 40 px sideways spike on ~3% of frames.
+  const spike = (px: number) => (px > 0 && Math.abs(rnd()) > 0.97 ? rnd() * 40 : 0);
+  const noisy = (p: Pos, px: number): Pos => [
+    p[0] + rnd() * px + spike(px),
+    p[1] + rnd() * px,
+    p[2] + rnd() * px + spike(px),
+    p[3] + rnd() * px,
+  ];
+
+  /** Stages 1..last in order; `at(stage)` is where the person actually stands. */
+  function sequence(at: (s: Stage) => Pos, last: Stage, px = 0, maxS = 60) {
+    const fx = new FrontFeatures(1000, 1000);
+    const det = new BalanceDetector();
+    let t = 0;
+    const holdStarts: number[] = [];
+    for (let stage = 1 as Stage; stage <= last; stage = (stage + 1) as Stage) {
+      det.startStage(stage, t);
+      const startT = t;
+      const prev = POS[(stage > 1 ? stage - 1 : 1) as Stage];
+      let guard = 0;
+      while ((det.status === "waitStance" || det.status === "holding") && guard++ < maxS * 30) {
+        det.push(fx.push(t, lms(noisy(t - startT < 1500 ? prev : at(stage), px))), t);
+        if (det.status === "holding" && holdStarts.length < stage) holdStarts.push(t - startT);
+        t += 1000 / 30;
+      }
+      if (det.status !== "held") break;
+    }
+    return { det, holdStarts };
+  }
+
+  it("recognises the tandem stance within a few seconds and holds it", () => {
+    const { det, holdStarts } = sequence((s) => POS[s], 4);
+    expect(det.results.map((r) => r.completed)).toEqual([true, true, true, true]);
+    expect(det.results.map((r) => r.stanceVerified)).toEqual([true, true, true, true]);
+    expect(holdStarts[2]).toBeLessThan(4000); // was the full 15 s grace period
+  });
+
+  it("ankle-order flips from jitter in a front-view tandem don't end the hold", () => {
+    let failed = 0;
+    for (let k = 0; k < 40; k++) {
+      const { det } = sequence((s) => POS[s], 3, 8);
+      if (det.results[2]?.completed !== true) failed++;
+    }
+    expect(failed).toBe(0);
+  });
+
+  it("standing in tandem during position 4 is not counted as a lifted foot", () => {
+    const { det } = sequence((s) => (s === 4 ? POS[3] : POS[s]), 4, 0, 14);
+    const four = det.results.find((r) => r.stage === 4);
+    expect(four?.completed).not.toBe(true);
+    expect(four?.stanceVerified).not.toBe(true);
+  });
+
+  it("someone who never lifts a foot in position 4 gets a result, not an endless wait", () => {
+    const { det } = sequence((s) => (s === 4 ? ([510, 750, 490, 750] as Pos) : POS[s]), 4, 0, 60);
+    expect(det.status).toBe("failed");
+    expect(det.results.find((r) => r.stage === 4)?.completed).toBe(false);
+  });
+});

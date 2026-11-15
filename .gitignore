@@ -16,3 +16,7 @@ recordings/
 *.webm
 landmarks/
 public/mediapipe/
+
+AUDIT.md
+CLAUDE.md
+MASTER.md
